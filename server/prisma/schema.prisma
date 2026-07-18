@@ -1,0 +1,321 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  VENDOR
+  CUSTOMER
+}
+
+enum ProductType {
+  GOODS
+  SERVICE
+  RENTAL
+}
+
+enum Periodicity {
+  HOUR
+  DAY
+  NIGHT
+  WEEK
+  MONTH
+}
+
+enum OrderStatus {
+  QUOTATION
+  QUOTATION_SENT
+  CONFIRMED
+  PICKED_UP
+  RETURNED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  NOTHING_TO_INVOICE
+  INVOICED
+}
+
+enum DepositStatus {
+  HELD
+  REFUNDED
+  DEDUCTED
+}
+
+enum LineType {
+  RENTAL
+  DEPOSIT
+  LATE_FEE
+  NOTE
+}
+
+enum InvoiceDocStatus {
+  DRAFT
+  POSTED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  WALLET
+}
+
+enum PaymentType {
+  RENTAL
+  DEPOSIT
+  LATE_FEE
+}
+
+enum DisplayType {
+  RADIO
+  PILLS
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
+  passwordHash String
+  name         String
+  role         Role           @default(CUSTOMER)
+  phone        String?
+  gstNo        String?
+  address      String?
+  companyName  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  
+  // Relations
+  customerOrders RentalOrder[]  @relation("CustomerOrders")
+  vendorOrders   RentalOrder[]  @relation("VendorOrders")
+  products       Product[]      @relation("VendorProducts")
+  notifications  Notification[]
+  invoices       Invoice[]      @relation("CustomerInvoices")
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+}
+
+model Product {
+  id               Int                @id @default(autoincrement())
+  name             String
+  type             ProductType        @default(RENTAL)
+  categoryId       Int
+  vendorId         Int?
+  images           String[]           // PostgreSQL native string array
+  salesPrice       Float              @default(0.0)
+  costPrice        Float              @default(0.0)
+  qtyOnHand        Int                @default(0)
+  securityDeposit  Float              @default(0.0)
+  periodicity      Periodicity        @default(DAY)
+  pickupTime       String?
+  returnTime       String?
+  lateFeePerHour   Float              @default(0.0)
+  published        Boolean            @default(false)
+  rentalCount      Int                @default(0)
+  totalRentalHours Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  // Relations
+  category         Category           @relation(fields: [categoryId], references: [id])
+  vendor           User?              @relation("VendorProducts", fields: [vendorId], references: [id])
+  pricelistItems   PricelistItem[]
+  orderLines       RentalOrderLine[]
+  attributes       ProductAttribute[]
+  invoiceLines     InvoiceLine[]
+}
+
+model ProductAttribute {
+  id          Int                    @id @default(autoincrement())
+  productId   Int
+  name        String
+  displayType DisplayType            @default(PILLS)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  // Relations
+  product     Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values      ProductAttributeValue[]
+}
+
+model ProductAttributeValue {
+  id          Int              @id @default(autoincrement())
+  attributeId Int
+  value       String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  attribute   ProductAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+}
+
+model Pricelist {
+  id        Int             @id @default(autoincrement())
+  name      String          @unique
+  isDefault Boolean         @default(false)
+  validFrom DateTime?
+  validTo   DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relations
+  items     PricelistItem[]
+  orders    RentalOrder[]
+}
+
+model PricelistItem {
+  id          Int         @id @default(autoincrement())
+  pricelistId Int
+  productId   Int
+  period      Periodicity @default(DAY)
+  price       Float       @default(0.0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  pricelist   Pricelist   @relation(fields: [pricelistId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([pricelistId, productId, period])
+}
+
+model RentalOrder {
+  id              Int           @id @default(autoincrement())
+  reference       String        @unique
+  customerId      Int
+  vendorId        Int?
+  status          OrderStatus   @default(QUOTATION)
+  invoiceStatus   InvoiceStatus @default(NOTHING_TO_INVOICE)
+  rentalStart     DateTime
+  rentalEnd       DateTime
+  actualReturn    DateTime?
+  pickupType      String        @default("STORE")
+  deliveryAddress String?
+  invoiceAddress  String?
+  pricelistId     Int?
+  untaxed         Float         @default(0.0)
+  tax             Float         @default(0.0)
+  total           Float         @default(0.0)
+  depositAmount   Float         @default(0.0)
+  depositStatus   DepositStatus @default(HELD)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  customer        User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  vendor          User?         @relation("VendorOrders", fields: [vendorId], references: [id])
+  pricelist       Pricelist?    @relation(fields: [pricelistId], references: [id])
+  lines           RentalOrderLine[]
+  invoice         Invoice?
+  payments        Payment[]
+  notifications   Notification[]
+}
+
+model RentalOrderLine {
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  productId   Int?
+  lineType    LineType    @default(RENTAL)
+  description String
+  qty         Int         @default(1)
+  unit        String      @default("Units")
+  unitPrice   Float       @default(0.0)
+  taxPct      Float       @default(18.0)
+  subtotal    Float       @default(0.0)
+  rentalStart DateTime?
+  rentalEnd   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  order       RentalOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product?    @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+  id          Int              @id @default(autoincrement())
+  reference   String           @unique
+  orderId     Int              @unique
+  customerId  Int
+  status      InvoiceDocStatus @default(DRAFT)
+  invoiceDate DateTime         @default(now())
+  untaxed     Float            @default(0.0)
+  tax         Float            @default(0.0)
+  total       Float            @default(0.0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  order       RentalOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer    User             @relation("CustomerInvoices", fields: [customerId], references: [id])
+  lines       InvoiceLine[]
+}
+
+model InvoiceLine {
+  id          Int      @id @default(autoincrement())
+  invoiceId   Int
+  productId   Int?
+  description String
+  qty         Int      @default(1)
+  unit        String   @default("Units")
+  unitPrice   Float    @default(0.0)
+  taxPct      Float    @default(18.0)
+  amount      Float    @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id        Int           @id @default(autoincrement())
+  orderId   Int
+  amount    Float         @default(0.0)
+  method    PaymentMethod @default(CASH)
+  type      PaymentType   @default(RENTAL)
+  date      DateTime      @default(now())
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relations
+  order     RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  orderId   Int?
+  message   String
+  type      String       @default("INFO")
+  read      Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  // Relations
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order     RentalOrder? @relation(fields: [orderId], references: [id])
+}
+
+model Settings {
+  id                    Int      @id @default(autoincrement())
+  lateFeeEnabled        Boolean  @default(true)
+  defaultLateFeePerHour Float    @default(0.0)
+  gracePeriod           Int      @default(0)
+  defaultDepositPct     Float    @default(20.0)
+  companyName           String   @default("Rental Management Corp")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
