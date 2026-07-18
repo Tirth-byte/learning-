@@ -2,10 +2,16 @@ const prisma = require('../config/prisma');
 
 class DashboardService {
   async getStats({ role, userId, dateRange }) {
+    // scopeWhere: vendor ownership only. Used by the operational queues (due today,
+    // overdue, upcoming pickups/returns) which are driven by rental dates and must
+    // NOT be hidden by the selected createdAt window.
+    // where: scopeWhere PLUS the createdAt date-range, used by the financial metrics.
+    const scopeWhere = {};
     const where = {};
     const paymentWhere = {};
 
     if (role === 'VENDOR') {
+      scopeWhere.vendorId = parseInt(userId, 10);
       where.vendorId = parseInt(userId, 10);
       paymentWhere.order = { vendorId: parseInt(userId, 10) };
     }
@@ -71,7 +77,7 @@ class DashboardService {
 
     const dueTodayCount = await prisma.rentalOrder.count({
       where: {
-        ...where,
+        ...scopeWhere,
         status: 'PICKED_UP',
         rentalEnd: {
           gte: startOfToday,
@@ -83,7 +89,7 @@ class DashboardService {
     // 5. Overdue (rentalEnd is in the past, status is PICKED_UP)
     const overdueCount = await prisma.rentalOrder.count({
       where: {
-        ...where,
+        ...scopeWhere,
         status: 'PICKED_UP',
         rentalEnd: {
           lt: new Date(),
@@ -97,7 +103,7 @@ class DashboardService {
 
     const upcomingPickups = await prisma.rentalOrder.findMany({
       where: {
-        ...where,
+        ...scopeWhere,
         status: 'CONFIRMED',
         rentalStart: {
           gte: new Date(),
@@ -114,7 +120,7 @@ class DashboardService {
     // 7. Upcoming Returns (PICKED_UP status, ending within next 7 days)
     const upcomingReturns = await prisma.rentalOrder.findMany({
       where: {
-        ...where,
+        ...scopeWhere,
         status: 'PICKED_UP',
         rentalEnd: {
           gte: new Date(),

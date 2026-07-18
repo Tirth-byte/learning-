@@ -300,6 +300,13 @@ async function main() {
     d.setMinutes(d.getMinutes() + mins);
     return d;
   };
+  // Absolute time on *today's* date, independent of the current clock time — used so
+  // "due today" examples land inside today's window no matter when the seed is run.
+  const todayAt = (hour) => {
+    const d = new Date(now);
+    d.setHours(hour, 0, 0, 0);
+    return d;
+  };
 
   // 9. Rental Orders & lines
   // Order 1: QUOTATION (Aarav Sharma - Projector, future)
@@ -799,12 +806,72 @@ async function main() {
     },
   });
 
+  // 9b. Extra demo orders so every dashboard queue has live examples:
+  // upcoming pickups, upcoming returns, due-today, and overdue.
+  const makeDemoOrder = ({
+    reference, createdAt, customerId, vendorId, status, product,
+    unitPrice, days, rentalStart, rentalEnd, deposit, depositStatus = 'HELD',
+  }) => {
+    const untaxed = unitPrice * days;
+    const tax = Math.round(untaxed * 0.18 * 100) / 100;
+    return prisma.rentalOrder.create({
+      data: {
+        reference,
+        createdAt,
+        customerId,
+        vendorId,
+        status,
+        invoiceStatus: 'NOTHING_TO_INVOICE',
+        rentalStart,
+        rentalEnd,
+        untaxed,
+        tax,
+        total: untaxed + tax,
+        depositAmount: deposit,
+        depositStatus,
+        pricelistId: publicPricelist.id,
+        lines: {
+          create: [
+            {
+              productId: product.id,
+              lineType: 'RENTAL',
+              description: product.name,
+              qty: 1,
+              unit: 'Units',
+              unitPrice,
+              taxPct: 18.0,
+              subtotal: untaxed,
+              rentalStart,
+              rentalEnd,
+            },
+          ],
+        },
+      },
+    });
+  };
+
+  // Upcoming pickups (CONFIRMED, starting within the next 7 days)
+  await makeDemoOrder({ reference: 'SO0008', createdAt: getRelativeDate(-1), customerId: customer2.id, vendorId: vendor1.id, status: 'CONFIRMED', product: p2, unitPrice: 1500.0, days: 3, rentalStart: getRelativeDate(2, 10), rentalEnd: getRelativeDate(5, 18), deposit: 5000.0 });
+  const order9 = await makeDemoOrder({ reference: 'SO0009', createdAt: getRelativeDate(0), customerId: customer3.id, vendorId: vendor1.id, status: 'CONFIRMED', product: p6, unitPrice: 1200.0, days: 2, rentalStart: getRelativeDate(4, 9), rentalEnd: getRelativeDate(6, 18), deposit: 4000.0 });
+
+  // Upcoming returns (PICKED_UP, ending within the next 7 days)
+  await makeDemoOrder({ reference: 'SO0010', createdAt: getRelativeDate(-3), customerId: customer1.id, vendorId: vendor1.id, status: 'PICKED_UP', product: p3, unitPrice: 800.0, days: 4, rentalStart: getRelativeDate(-1, 10), rentalEnd: getRelativeDate(3, 18), deposit: 3000.0 });
+  await makeDemoOrder({ reference: 'SO0011', createdAt: getRelativeDate(-6), customerId: customer2.id, vendorId: vendor2.id, status: 'PICKED_UP', product: p4, unitPrice: 100.0, days: 7, rentalStart: getRelativeDate(-2, 10), rentalEnd: getRelativeDate(5, 18), deposit: 500.0 });
+
+  // Due today (PICKED_UP, ending today)
+  const order12 = await makeDemoOrder({ reference: 'SO0012', createdAt: getRelativeDate(0), customerId: customer3.id, vendorId: vendor1.id, status: 'PICKED_UP', product: p1, unitPrice: 500.0, days: 3, rentalStart: getRelativeDate(-3, 10), rentalEnd: todayAt(23), deposit: 2000.0 });
+
+  // Overdue (PICKED_UP, ended in the past)
+  await makeDemoOrder({ reference: 'SO0013', createdAt: getRelativeDate(-5), customerId: customer1.id, vendorId: vendor1.id, status: 'PICKED_UP', product: p2, unitPrice: 1500.0, days: 3, rentalStart: getRelativeDate(-5, 10), rentalEnd: getRelativeDate(-2, 18), deposit: 5000.0 });
+
   // 10. Notifications
   await prisma.notification.createMany({
     data: [
       { userId: admin.id, orderId: order3.id, message: 'Rental SO0003 is due for pickup today.', type: 'PICKUP' },
       { userId: admin.id, orderId: order4.id, message: 'Rental SO0004 is active (Picked Up).', type: 'INFO' },
       { userId: customer3.id, orderId: order6.id, message: 'Your rental SO0006 was returned 5 hours late. Late fee applied.', type: 'ALERT' },
+      { userId: admin.id, orderId: order9.id, message: 'Rental SO0009 is scheduled for pickup in 4 days.', type: 'PICKUP' },
+      { userId: admin.id, orderId: order12.id, message: 'Rental SO0012 is due for return today.', type: 'ALERT' },
     ],
   });
 
