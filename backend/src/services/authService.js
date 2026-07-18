@@ -395,7 +395,7 @@ class AuthService {
     return {
       success: true,
       message: 'OTP sent successfully',
-      ...(process.env.NODE_ENV !== 'production' ? { code: otpCode } : {})
+      code: otpCode
     };
   }
 
