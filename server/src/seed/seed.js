@@ -306,6 +306,7 @@ async function main() {
   const order1 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0001',
+      createdAt: getRelativeDate(0), // today
       customerId: customer1.id,
       vendorId: vendor1.id,
       status: 'QUOTATION',
@@ -350,6 +351,7 @@ async function main() {
   const order2 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0002',
+      createdAt: getRelativeDate(-1), // yesterday
       customerId: customer2.id,
       vendorId: vendor2.id,
       status: 'QUOTATION_SENT',
@@ -394,6 +396,7 @@ async function main() {
   const order3 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0003',
+      createdAt: getRelativeDate(0), // today — counts in Today / 7 days / 30 days
       customerId: customer3.id,
       vendorId: vendor1.id,
       status: 'CONFIRMED',
@@ -473,6 +476,7 @@ async function main() {
   const order4 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0004',
+      createdAt: getRelativeDate(-4), // 4 days ago — counts in 7 days / 30 days, not Today
       customerId: customer1.id,
       vendorId: vendor1.id,
       status: 'PICKED_UP',
@@ -552,6 +556,7 @@ async function main() {
   const order5 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0005',
+      createdAt: getRelativeDate(-15), // 15 days ago — counts in 30 days only
       customerId: customer2.id,
       vendorId: vendor2.id,
       status: 'RETURNED',
@@ -649,6 +654,7 @@ async function main() {
   const order6 = await prisma.rentalOrder.create({
     data: {
       reference: 'SO0006',
+      createdAt: getRelativeDate(-22), // 22 days ago — counts in 30 days only
       customerId: customer3.id,
       vendorId: vendor1.id,
       status: 'RETURNED',
@@ -761,6 +767,7 @@ async function main() {
   await prisma.rentalOrder.create({
     data: {
       reference: 'SO0007',
+      createdAt: getRelativeDate(-10), // 10 days ago (cancelled — excluded from sales)
       customerId: customer1.id,
       vendorId: vendor2.id,
       status: 'CANCELLED',

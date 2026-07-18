@@ -1,13 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/**
+ * ----------------------------------------------------------------------------------
+ * APPLICATION STYLESHEET ENTRY POINT
+ *
+ * WHAT THIS FILE DOES:
+ * Loads the font, then the design system in dependency order: tokens first (which
+ * define the variables), then the global UI layer (which consumes them).
+ *
+ * HOW IT FITS INTO THE APP:
+ * Imported once by main.jsx. Individual pages import their own stylesheet on top of
+ * this when they need page-specific rules.
+ * ----------------------------------------------------------------------------------
+ */
+
+/* Weights 550/650/750/800 are used across the type scale in tokens.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;550;600;650;700;750;800&display=swap');
+
+@import './theme/tokens.css';
+@import './theme/ui.css';
 
 :root {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font);
   line-height: 1.5;
   font-weight: 400;
-  
   color-scheme: light;
-  color: #1F2937;
-  background-color: #F5F6F8;
+  color: var(--ink);
+  background-color: var(--tint);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,122 +36,20 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #F5F6F8;
 }
 
-/* Custom classes for enterprise admin dashboards */
-.app-container {
-  min-height: 100vh;
-  display: flex;
+/* Kanban-style column scrollers on the schedule board */
+.kanban-scroll-list {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  padding-right: var(--s-1);
 }
 
-.enterprise-card {
-  background: #ffffff;
-  border: 1px solid #E5E7EB;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+/* Retained for pages still using the original entry animation class */
+.fadeIn-animation {
+  animation: u-rise 0.32s var(--ease) both;
 }
 
-.dense-table .ant-table-thead > tr > th {
-  background: #F9FAFB !important;
-  color: #374151 !important;
-  font-weight: 600 !important;
-  border-bottom: 1px solid #E5E7EB !important;
-  padding: 8px 12px !important;
-}
-
-.dense-table .ant-table-tbody > tr > td {
-  padding: 8px 12px !important;
-  border-bottom: 1px solid #F3F4F6 !important;
-}
-
-.dense-table .ant-table-tbody > tr:hover > td {
-  background-color: #F9FAFB !important;
-}
-
-/* Tabular figures for numbers alignment in tables */
 .tabular-numbers {
   font-variant-numeric: tabular-nums;
-}
-
-/* Status colors inside tags */
-.status-tag {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-/* Remove default Ant Design box-shadow on focused elements */
-.ant-btn:focus,
-.ant-input:focus,
-.ant-select-selector:focus {
-  box-shadow: none !important;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fadeIn-animation {
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Scrollbar Customization */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF;
-}
-
-/* Enterprise Card Hover Scaling */
-.enterprise-card {
-  background: #ffffff;
-  border: 1px solid #E5E7EB;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.enterprise-card:hover {
-  border-color: #D1D5DB;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
-
-/* Custom Kanban Column scroll lists */
-.kanban-scroll-list {
-  max-height: calc(100vh - 240px);
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-/* Sidebar Custom active border highlight */
-.ant-menu-item-selected {
-  background-color: #F3F4F6 !important;
-  color: #3651A5 !important;
-  font-weight: 500 !important;
-}
-
-.ant-menu-item-selected::after {
-  border-right: 3px solid #3651A5 !important;
 }

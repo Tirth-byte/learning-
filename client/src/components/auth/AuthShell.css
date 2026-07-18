@@ -1,0 +1,311 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * AUTH SHELL STYLES
+ *
+ * WHAT THIS FILE DOES:
+ * Styles the split-screen auth frame. The brand panel is shown/hidden with a media
+ * query — the previous inline `display:'none'` plus antd-style breakpoint keys did
+ * not work in React and hid the panel at every width.
+ *
+ * HOW IT FITS INTO THE APP:
+ * Imported by components/auth/AuthShell.jsx.
+ * ----------------------------------------------------------------------------------
+ */
+
+.auth-shell {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+/* -------------------------------------------------------------- BRAND PANEL */
+
+.auth-panel {
+  position: relative;
+  display: flex;
+  padding: var(--s-12) var(--s-10);
+  color: #fff;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.auth-panel-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--grad-brand);
+  background-size: 220% 220%;
+  animation: auth-mesh 24s ease-in-out infinite;
+}
+
+@keyframes auth-mesh {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.auth-panel-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s-12);
+  max-width: 460px;
+  margin: auto;
+  width: 100%;
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.0625rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: #fff;
+  text-decoration: none;
+}
+
+.auth-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 16px;
+  flex: none;
+}
+
+.auth-panel-title {
+  margin: 0 0 var(--s-4);
+  font-size: clamp(1.75rem, 2.6vw, 2.375rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.auth-panel-text {
+  margin: 0;
+  font-size: var(--t-base);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.auth-highlights {
+  list-style: none;
+  margin: var(--s-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s-3);
+}
+
+.auth-highlights li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.auth-highlights .anticon {
+  margin-top: 2px;
+  color: var(--accent-teal);
+  flex: none;
+}
+
+.auth-panel-foot {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* --------------------------------------------------------------- FORM SIDE */
+
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-10) var(--s-6);
+}
+
+.auth-form-wrap {
+  width: 100%;
+  max-width: 400px;
+  animation: u-rise 0.35s var(--ease) both;
+}
+
+.auth-brand-compact {
+  display: none;
+  color: var(--ink);
+  margin-bottom: var(--s-6);
+}
+
+.auth-brand-compact .auth-brand-mark {
+  background: linear-gradient(135deg, var(--accent-teal), var(--brand-500) 55%, var(--accent-violet));
+  border: none;
+  color: #fff;
+}
+
+.auth-head {
+  margin-bottom: var(--s-6);
+}
+
+.auth-head .u-body {
+  margin: 6px 0 0;
+}
+
+.auth-foot {
+  margin-top: var(--s-6);
+  text-align: center;
+  font-size: var(--t-sm);
+  color: var(--muted);
+}
+
+.auth-foot a {
+  color: var(--brand-500);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.auth-foot a:hover {
+  text-decoration: underline;
+}
+
+/* Divider with a centered label, used above the demo logins */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-6) 0 var(--s-4);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* Quick-login buttons for demos */
+.auth-demos {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.auth-demo {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 10px var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s var(--ease);
+}
+
+.auth-demo:hover:not(:disabled) {
+  border-color: var(--brand-300);
+  box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
+}
+
+.auth-demo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-demo-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  background: var(--grad-soft);
+  color: var(--brand-500);
+  font-size: 15px;
+  flex: none;
+}
+
+.auth-demo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.auth-demo-text strong {
+  font-size: var(--t-sm);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.auth-demo-text span {
+  font-size: var(--t-2xs);
+  color: var(--muted);
+}
+
+.auth-demo-arrow {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+/* Password rule checklist under the password field */
+.auth-rules {
+  display: grid;
+  gap: 6px;
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--tint);
+}
+
+.auth-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-2xs);
+  color: var(--muted);
+  transition: color 0.16s ease;
+}
+
+.auth-rule.is-met {
+  color: var(--success);
+}
+
+.auth-rule .anticon {
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------- RESPONSIVE */
+
+@media (max-width: 900px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  /* Hidden by a media query — the correct mechanism, unlike the previous
+     inline style which hid it on every screen size including desktop. */
+  .auth-panel {
+    display: none;
+  }
+
+  .auth-brand-compact {
+    display: inline-flex;
+  }
+
+  .auth-main {
+    padding: var(--s-8) var(--s-5);
+    align-items: flex-start;
+  }
+}

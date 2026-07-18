@@ -1,10 +1,48 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * CART PAGE
+ *
+ * WHAT THIS FILE DOES:
+ * Lists the rental lines the customer has configured, lets them adjust quantities or
+ * remove lines, and totals the rent and refundable deposits before checkout.
+ *
+ * HOW IT FITS INTO THE APP:
+ * Routed at '/cart'. The cart is client-side only, stored in localStorage under
+ * 'rental_cart'; every mutation fires 'cartUpdated' so the header badge stays right.
+ *
+ * WHERE TO CHANGE THINGS:
+ *   - Totals math lives in the derived values in the component.
+ *   - Layout lives in storefront.css under the `.sf-cart` and `.sf-line` rules.
+ * ----------------------------------------------------------------------------------
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Typography, Card, Row, Col, Button, List, Popconfirm, Empty, Divider, Tag } from 'antd';
-import { DeleteOutlined, ShoppingCartOutlined, RightOutlined } from '@ant-design/icons';
+import { Button, Popconfirm, InputNumber, message } from 'antd';
+import {
+  DeleteOutlined,
+  ShoppingCartOutlined,
+  ShoppingOutlined,
+  RightOutlined,
+  SafetyCertificateOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { PageHeader, EmptyState, Surface, formatCurrency } from '../../components/ui';
+import './storefront.css';
 
-const { Title, Text } = Typography;
+const STORAGE_KEY = 'rental_cart';
+
+/**
+ * Inclusive rental day count for a cart line. A Mon–Tue booking bills 2 days.
+ * Falls back to 1 so a malformed date range never produces a zero charge.
+ */
+const getRentalDays = (item) => {
+  const start = dayjs(item.rentalStart);
+  const end = dayjs(item.rentalEnd);
+  const days = end.diff(start, 'day') + 1;
+  return days > 0 ? days : 1;
+};
 
 const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
@@ -17,161 +55,185 @@ const Cart = () => {
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, []);
 
+  /** Read the cart from localStorage, tolerating corrupt data. */
   const loadCart = () => {
     try {
-      const items = JSON.parse(localStorage.getItem('rental_cart') || '[]');
-      setCartItems(items);
-    } catch (e) {
+      setCartItems(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+    } catch (error) {
       setCartItems([]);
     }
   };
 
-  const handleRemove = (index) => {
-    const newCart = [...cartItems];
-    newCart.splice(index, 1);
-    localStorage.setItem('rental_cart', JSON.stringify(newCart));
-    setCartItems(newCart);
+  /** Write the cart back and notify the header badge. */
+  const persistCart = (nextCart) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextCart));
+    setCartItems(nextCart);
     window.dispatchEvent(new Event('cartUpdated'));
   };
 
-  const calculateSubtotal = () => {
-    return cartItems.reduce((acc, item) => {
-      const price = item.product?.salesPrice || 0;
-      const start = dayjs(item.rentalStart);
-      const end = dayjs(item.rentalEnd);
-      const days = end.diff(start, 'day') + 1;
-      return acc + (price * item.qty * (days > 0 ? days : 1));
-    }, 0);
+  const handleRemove = (index) => {
+    const nextCart = cartItems.filter((_, itemIndex) => itemIndex !== index);
+    persistCart(nextCart);
+    message.success('Item removed from your cart.');
   };
 
-  const calculateDeposits = () => {
-    return cartItems.reduce((acc, item) => {
-      const deposit = item.product?.securityDeposit || 0;
-      return acc + (deposit * item.qty);
-    }, 0);
+  /** Change the quantity on a line, clamped to available stock. */
+  const handleQuantityChange = (index, quantity) => {
+    const nextCart = cartItems.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, qty: Math.max(1, quantity || 1) } : item);
+    persistCart(nextCart);
   };
 
-  const subtotal = calculateSubtotal();
-  const deposits = calculateDeposits();
-  const grandTotal = subtotal + deposits;
+  // ---- Totals --------------------------------------------------------------
+  const rentalSubtotal = cartItems.reduce((sum, item) => {
+    const price = item.product?.salesPrice || 0;
+    return sum + price * item.qty * getRentalDays(item);
+  }, 0);
+
+  const depositTotal = cartItems.reduce(
+    (sum, item) => sum + (item.product?.securityDeposit || 0) * item.qty, 0);
+
+  const dueToday = rentalSubtotal + depositTotal;
 
   if (cartItems.length === 0) {
     return (
-      <div style={{ padding: '48px 8px', textAlign: 'center' }}>
-        <Card className="enterprise-card" style={{ maxWidth: 500, margin: '0 auto', padding: '24px' }}>
-          <Empty 
-            description={<Text style={{ fontSize: 14, color: '#6B7280' }}>Your rental cart is currently empty</Text>} 
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
+      <div className="page page-narrow">
+        <PageHeader title="Your cart" />
+        <Surface pad={false}>
+          <EmptyState
+            icon={<ShoppingCartOutlined />}
+            title="Your cart is empty"
+            text="Browse the catalog and pick a rental window to get started."
+            actionLabel="Browse the catalog"
+            to="/products"
           />
-          <Button type="primary" onClick={() => navigate('/')} style={{ marginTop: 16, backgroundColor: '#3651A5', borderRadius: 6 }}>
-            Browse Fleet
-          </Button>
-        </Card>
+        </Surface>
       </div>
     );
   }
 
   return (
-    <div className="fadeIn-animation" style={{ padding: '0 8px 24px 8px', maxWidth: '1000px', margin: '0 auto' }}>
-      <Title level={4} style={{ color: '#1F2937', marginBottom: '24px' }}>
-        <ShoppingCartOutlined style={{ marginRight: 8, color: '#3651A5' }} />
-        Review Selected Rentals
-      </Title>
+    <div className="page">
+      <PageHeader
+        title="Your cart"
+        subtitle={`${cartItems.length} ${cartItems.length === 1 ? 'item' : 'items'} ready to book.`}
+      />
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
-          <List
-            itemLayout="horizontal"
-            dataSource={cartItems}
-            renderItem={(item, index) => {
-              const price = item.product?.salesPrice || 0;
-              const start = dayjs(item.rentalStart);
-              const end = dayjs(item.rentalEnd);
-              const days = end.diff(start, 'day') + 1;
-              const rentalCost = price * item.qty * (days > 0 ? days : 1);
-              const securityDeposit = (item.product?.securityDeposit || 0) * item.qty;
+      <div className="sf-cart">
+        {/* -------------------------------------------------------- Lines */}
+        <Surface pad={false}>
+          {cartItems.map((item, index) => {
+            const days = getRentalDays(item);
+            const lineTotal = (item.product?.salesPrice || 0) * item.qty * days;
+            const lineDeposit = (item.product?.securityDeposit || 0) * item.qty;
 
-              return (
-                <List.Item
-                  className="enterprise-card"
-                  style={{ backgroundColor: '#fff', padding: '16px', marginBottom: '12px', display: 'flex' }}
-                  actions={[
-                    <Popconfirm title="Remove item?" onConfirm={() => handleRemove(index)}>
-                      <Button type="text" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
-                  ]}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      <div style={{ width: 70, height: 70, backgroundColor: '#F3F4F6', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
-                        {item.product?.images && item.product.images.length > 0 ? (
-                          <img src={item.product.images[0]} alt={item.product?.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <ShoppingCartOutlined style={{ fontSize: 20, color: '#9CA3AF' }} />
-                        )}
-                      </div>
-                    }
-                    title={<Text strong style={{ fontSize: 14 }}>{item.product?.name}</Text>}
-                    description={
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          📅 Duration: {start.format('MMM DD, YYYY')} - {end.format('MMM DD, YYYY')} ({days} days)
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          📦 Quantity: {item.qty} × ₹{price.toFixed(2)}/day
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          🛡️ Held Deposit: ₹{securityDeposit.toFixed(2)}
-                        </Text>
-                      </div>
-                    }
-                  />
-                  <div style={{ textAlign: 'right', minWidth: '100px' }}>
-                    <Tag color="blue" className="status-tag" style={{ margin: '0 0 4px 0' }}>Rental fee</Tag>
-                    <br />
-                    <Text strong style={{ fontSize: 15, color: '#3651A5' }} className="tabular-numbers">₹{rentalCost.toFixed(2)}</Text>
+            return (
+              <div className="sf-line" key={`${item.product?.id}-${index}`}>
+                <div className="sf-line-media">
+                  {item.product?.images?.length > 0 ? (
+                    <img src={item.product.images[0]} alt={item.product.name} />
+                  ) : (
+                    <ShoppingOutlined style={{ fontSize: 24, color: 'var(--faint)' }} />
+                  )}
+                </div>
+
+                <div className="sf-line-body">
+                  <div className="sf-line-title">{item.product?.name}</div>
+
+                  <div className="sf-line-meta">
+                    <span>
+                      {dayjs(item.rentalStart).format('DD MMM')} – {dayjs(item.rentalEnd).format('DD MMM YYYY')}
+                    </span>
+                    <span>{days} {days === 1 ? 'day' : 'days'}</span>
+                    <span>{formatCurrency(item.product?.salesPrice)} / {item.product?.periodicity?.toLowerCase() || 'day'}</span>
                   </div>
-                </List.Item>
-              );
-            }}
-          />
-        </Col>
 
-        <Col xs={24} lg={8}>
-          <Card bordered={false} className="enterprise-card" title="Rental Estimate" headStyle={{ borderBottom: '1px solid #E5E7EB', padding: '0 16px' }}>
-            <Row justify="space-between" style={{ marginBottom: 12 }}>
-              <Col><Text type="secondary">Rental Subtotal</Text></Col>
-              <Col><Text className="tabular-numbers">₹{subtotal.toFixed(2)}</Text></Col>
-            </Row>
-            
-            <Row justify="space-between" style={{ marginBottom: 16 }}>
-              <Col><Text type="secondary">Security Deposits</Text></Col>
-              <Col><Text className="tabular-numbers">₹{deposits.toFixed(2)}</Text></Col>
-            </Row>
-            
-            <div style={{ background: '#F9FAFB', padding: 8, borderRadius: 6, border: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', marginBottom: 16 }}>
-              Security deposits are fully refundable on return of equipment.
+                  <div className="u-row">
+                    <span className="u-muted" style={{ fontSize: 'var(--t-2xs)' }}>Qty</span>
+                    <InputNumber
+                      size="small"
+                      min={1}
+                      max={item.product?.qtyOnHand || 99}
+                      value={item.qty}
+                      onChange={(value) => handleQuantityChange(index, value)}
+                      style={{ width: 68 }}
+                    />
+                    {lineDeposit > 0 && (
+                      <span className="u-muted" style={{ fontSize: 'var(--t-2xs)' }}>
+                        + {formatCurrency(lineDeposit)} deposit
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="sf-line-right">
+                  <span className="sf-line-total">{formatCurrency(lineTotal)}</span>
+                  <Popconfirm
+                    title="Remove this item?"
+                    okText="Remove"
+                    cancelText="Keep"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleRemove(index)}
+                  >
+                    <Button type="text" danger size="small" icon={<DeleteOutlined />}>
+                      Remove
+                    </Button>
+                  </Popconfirm>
+                </div>
+              </div>
+            );
+          })}
+        </Surface>
+
+        {/* ------------------------------------------------------ Summary */}
+        <div className="sf-summary">
+          <Surface title="Order summary">
+            <div className="sf-summary-row">
+              <span>Rental subtotal</span>
+              <strong>{formatCurrency(rentalSubtotal)}</strong>
+            </div>
+            <div className="sf-summary-row">
+              <span>Refundable deposits</span>
+              <strong>{formatCurrency(depositTotal)}</strong>
+            </div>
+            <div className="sf-summary-row sf-summary-total">
+              <span>Due today</span>
+              <strong>{formatCurrency(dueToday)}</strong>
             </div>
 
-            <Divider style={{ margin: '12px 0' }} />
-            
-            <Row justify="space-between" style={{ marginBottom: 24 }}>
-              <Col><Text strong style={{ fontSize: 14 }}>Total Due Now</Text></Col>
-              <Col><Text strong style={{ fontSize: 18, color: '#3651A5' }} className="tabular-numbers">₹{grandTotal.toFixed(2)}</Text></Col>
-            </Row>
-
-            <Button 
-              type="primary" 
-              size="large" 
-              block 
-              style={{ backgroundColor: '#3651A5', height: '40px', borderRadius: 6, fontSize: 14, fontWeight: 500 }}
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<RightOutlined />}
+              style={{ marginTop: 'var(--s-4)' }}
               onClick={() => navigate('/checkout')}
             >
-              Confirm & Book <RightOutlined />
+              Proceed to checkout
             </Button>
-          </Card>
-        </Col>
-      </Row>
+
+            <Button
+              type="text"
+              block
+              style={{ marginTop: 'var(--s-2)' }}
+              onClick={() => navigate('/products')}
+            >
+              Continue shopping
+            </Button>
+
+            <div className="sf-assurances">
+              <span className="sf-assurance">
+                <SafetyCertificateOutlined />
+                {formatCurrency(depositTotal)} of this total is a refundable deposit, returned in full on an on-time return.
+              </span>
+              <span className="sf-assurance">
+                <ClockCircleOutlined />
+                Late returns are billed per hour and settled against the deposit automatically.
+              </span>
+            </div>
+          </Surface>
+        </div>
+      </div>
     </div>
   );
 };

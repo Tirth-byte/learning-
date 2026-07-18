@@ -73,7 +73,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, forgotPassword }}>
+    // setUser is exposed so the Profile page can refresh the cached user after a save
+    <AuthContext.Provider value={{ user, setUser, token, loading, login, register, logout, forgotPassword }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,168 +1,254 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * STOREFRONT LAYOUT
+ *
+ * WHAT THIS FILE DOES:
+ * Renders the customer-facing chrome: promo bar, sticky header with catalog search
+ * and cart count, the routed page, and the site footer.
+ *
+ * HOW IT FITS INTO THE APP:
+ * Mounted by App.jsx for the storefront routes ('/products', '/cart', '/checkout',
+ * '/my-orders', '/profile'). The marketing page at '/' has its own chrome and does
+ * not use this layout.
+ *
+ * WHERE TO CHANGE THINGS:
+ *   - Promo bar text and brand name are constants below.
+ *   - Visual rules live in CustomerLayout.css.
+ * ----------------------------------------------------------------------------------
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Button, Avatar, Dropdown, Badge, Input, Typography } from 'antd';
+import { Layout, Button, Avatar, Dropdown, Badge, Input, Drawer } from 'antd';
 import {
   ShoppingCartOutlined,
   UserOutlined,
   LogoutOutlined,
-  ShoppingOutlined,
   SearchOutlined,
+  MenuOutlined,
+  DashboardOutlined,
+  ProfileOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
-import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Outlet, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import './CustomerLayout.css';
 
-const { Header, Content, Footer } = Layout;
-const { Text } = Typography;
+const { Content } = Layout;
+
+// CHANGE THIS TO RENAME THE STORE
+const BRAND_NAME = 'Odoo Rent Shop';
+
+// CHANGE THIS TO EDIT THE PROMOTIONAL STRIP ABOVE THE HEADER
+const PROMO_TEXT = 'Security deposits are held separately and refunded in full on an on-time return.';
+
+// Primary storefront navigation
+const STORE_LINKS = [
+  { to: '/products', label: 'Catalog' },
+  { to: '/my-orders', label: 'My orders', authOnly: true },
+];
 
 export default function CustomerLayout() {
   const { user, logout } = useAuth();
   const [cartCount, setCartCount] = useState(0);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     updateCartCount();
-    // Listen for custom event to update cart count instantly on add
+    // The cart lives in localStorage; pages dispatch this event after mutating it
     window.addEventListener('cartUpdated', updateCartCount);
-    return () => {
-      window.removeEventListener('cartUpdated', updateCartCount);
-    };
+    return () => window.removeEventListener('cartUpdated', updateCartCount);
   }, []);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  /**
+   * Recompute the header cart badge from localStorage.
+   *
+   * Input:  none
+   * Output: sets cartCount; falls back to 0 if the stored cart is unparseable.
+   */
   const updateCartCount = () => {
     try {
       const cart = JSON.parse(localStorage.getItem('rental_cart') || '[]');
       setCartCount(cart.reduce((sum, item) => sum + (item.qty || 1), 0));
-    } catch (e) {
+    } catch (error) {
       setCartCount(0);
     }
   };
 
-  const handleMenuClick = (e) => {
-    if (e.key === 'logout') {
+  /**
+   * Push the search term into the catalog URL so the catalog page can filter on it.
+   */
+  const handleSearch = (value) => {
+    const trimmed = value.trim();
+    navigate(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : '/products');
+  };
+
+  const handleProfileMenuClick = ({ key }) => {
+    if (key === 'logout') {
       logout();
       navigate('/login');
-    } else if (e.key === 'orders') {
+    } else if (key === 'orders') {
       navigate('/my-orders');
-    } else if (e.key === 'profile') {
+    } else if (key === 'profile') {
       navigate('/profile');
+    } else if (key === 'portal') {
+      navigate('/admin/dashboard');
     }
   };
 
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'VENDOR';
+
   const profileMenu = {
     items: [
-      { key: 'name', label: <Text strong>{user?.name || 'Customer'}</Text>, disabled: true },
-      { key: 'role', label: <Text type="secondary">{user?.role}</Text>, disabled: true },
+      {
+        key: 'identity',
+        label: (
+          <div className="cust-menu-identity">
+            <strong>{user?.name || 'Customer'}</strong>
+            <span>{user?.email}</span>
+          </div>
+        ),
+        disabled: true,
+      },
       { type: 'divider' },
-      { key: 'profile', label: 'My Profile' },
-      { key: 'orders', label: 'My Orders' },
+      { key: 'profile', icon: <UserOutlined />, label: 'My profile' },
+      { key: 'orders', icon: <ProfileOutlined />, label: 'My orders' },
+      ...(isStaff ? [{ key: 'portal', icon: <DashboardOutlined />, label: 'Admin portal' }] : []),
       { type: 'divider' },
-      { key: 'logout', icon: <LogoutOutlined />, label: 'Log out' },
+      { key: 'logout', icon: <LogoutOutlined />, label: 'Log out', danger: true },
     ],
-    onClick: handleMenuClick,
+    onClick: handleProfileMenuClick,
   };
 
+  const visibleLinks = STORE_LINKS.filter((link) => !link.authOnly || user);
+
   return (
-    <Layout style={{ minHeight: '100vh', backgroundColor: '#F5F6F8' }}>
-      {/* Top Promotional Announcement Banner */}
-      <div 
-        style={{ 
-          background: 'linear-gradient(90deg, #3651A5 0%, #1E293B 100%)', 
-          color: '#ffffff', 
-          textAlign: 'center', 
-          padding: '6px 12px', 
-          fontSize: '11px', 
-          fontWeight: 600,
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase'
-        }}
-      >
-        ✨ Special Promotion: Held deposits are fully insured. Rent with zero liability terms!
-      </div>
+    <Layout className="cust-shell">
+      <div className="cust-promo">{PROMO_TEXT}</div>
 
-      <Header
-        style={{
-          background: '#ffffff',
-          borderBottom: '1px solid #E5E7EB',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          height: 64,
-          padding: '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        {/* Left Side: Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShoppingOutlined style={{ fontSize: 24, color: '#3651A5' }} />
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#1F2937', letterSpacing: '-0.4px' }}>
-              Odoo Rent Shop
-            </span>
-          </Link>
-        </div>
+      <header className="cust-header">
+        <div className="cust-header-inner">
+          <div className="cust-header-left">
+            <Button
+              type="text"
+              className="cust-burger"
+              aria-label="Open menu"
+              icon={<MenuOutlined />}
+              onClick={() => setMobileNavOpen(true)}
+            />
 
-        {/* Middle Mock Search Bar */}
-        <div style={{ display: 'none', sm: 'block', width: 280 }}>
-          <Input 
-            placeholder="Search catalog..." 
-            prefix={<SearchOutlined style={{ color: '#9CA3AF' }} />} 
-            size="small"
-            style={{ borderRadius: 6, fontSize: 12 }}
-          />
-        </div>
+            <Link to="/" className="cust-logo">
+              <span className="cust-logo-mark"><ShopOutlined /></span>
+              <span className="cust-logo-name">{BRAND_NAME}</span>
+            </Link>
 
-        {/* Right Side: Cart, Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          {user ? (
-            <>
-              {/* Back to Admin if Admin/Vendor */}
-              {(user.role === 'ADMIN' || user.role === 'VENDOR') && (
-                <Button type="link" onClick={() => navigate('/admin/dashboard')} style={{ fontSize: 12, padding: 0 }}>
-                  Go to Portal
-                </Button>
-              )}
+            <nav className="cust-nav">
+              {visibleLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`cust-nav-link${location.pathname === link.to ? ' is-active' : ''}`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
 
-              {/* Cart Icon */}
-              <Link to="/cart">
-                <Badge count={cartCount} size="small" offset={[5, -5]} color="#3651A5">
-                  <Button type="text" icon={<ShoppingCartOutlined style={{ fontSize: 18 }} />} />
-                </Badge>
-              </Link>
+          <div className="cust-search">
+            <Input
+              allowClear
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              onPressEnter={(event) => handleSearch(event.target.value)}
+              placeholder="Search the catalog"
+              prefix={<SearchOutlined style={{ color: 'var(--faint)' }} />}
+            />
+          </div>
 
-              {/* Profile Dropdown */}
-              <Dropdown menu={profileMenu} trigger={['click']}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <Avatar style={{ backgroundColor: '#3651A5' }} icon={<UserOutlined />} size="small" />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#1F2937', display: 'none', md: 'inline' }}>
-                    {user.name.split(' ')[0]}
-                  </span>
-                </div>
+          <div className="cust-header-right">
+            <Link to="/cart" aria-label="Cart" className="cust-cart">
+              <Badge count={cartCount} size="small" offset={[-2, 4]} color="var(--brand-500)">
+                <Button type="text" icon={<ShoppingCartOutlined style={{ fontSize: 18 }} />} />
+              </Badge>
+            </Link>
+
+            {user ? (
+              <Dropdown menu={profileMenu} trigger={['click']} placement="bottomRight">
+                <button className="cust-profile" type="button">
+                  <Avatar size={30} style={{ background: 'var(--brand-500)' }} icon={<UserOutlined />} />
+                  <span className="cust-profile-name">{user.name?.split(' ')[0]}</span>
+                </button>
               </Dropdown>
-            </>
-          ) : (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button type="text" size="small" onClick={() => navigate('/login')}>
-                Log In
-              </Button>
-              <Button type="primary" size="small" style={{ backgroundColor: '#3651A5', borderRadius: 4 }} onClick={() => navigate('/register')}>
-                Sign Up
-              </Button>
-            </div>
-          )}
+            ) : (
+              <div className="cust-auth-actions">
+                <Button type="text" onClick={() => navigate('/login')}>Log in</Button>
+                <Button type="primary" className="btn-pill" onClick={() => navigate('/register')}>
+                  Sign up
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
-      </Header>
+      </header>
 
-      <Content style={{ padding: '0 16px', marginTop: 24, minHeight: 'calc(100vh - 128px)' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <Outlet />
-        </div>
+      <Content className="cust-content">
+        <Outlet />
       </Content>
 
-      <Footer style={{ textAlign: 'center', background: '#ffffff', borderTop: '1px solid #E5E7EB', padding: '16px 0', marginTop: 40, fontSize: 11, color: '#6B7280' }}>
-        Odoo Rental Management System ©2026. India Operations.
-      </Footer>
+      <footer className="cust-footer">
+        <div className="cust-footer-inner">
+          <div className="cust-footer-brand">
+            <Link to="/" className="cust-logo">
+              <span className="cust-logo-mark"><ShopOutlined /></span>
+              <span className="cust-logo-name">{BRAND_NAME}</span>
+            </Link>
+            <p>Rental management from quotation to settled deposit.</p>
+          </div>
+
+          <div className="cust-footer-links">
+            <Link to="/products">Catalog</Link>
+            <Link to="/my-orders">My orders</Link>
+            <Link to="/cart">Cart</Link>
+            <Link to="/">About</Link>
+          </div>
+        </div>
+
+        <div className="cust-footer-base">
+          <span>{BRAND_NAME} © 2026. India Operations.</span>
+          <span>Late fees are calculated per hour and settled against the deposit.</span>
+        </div>
+      </footer>
+
+      {/* Mobile navigation */}
+      <Drawer
+        placement="left"
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        width={272}
+        title={BRAND_NAME}
+      >
+        <nav className="cust-mobile-nav">
+          {visibleLinks.map((link) => (
+            <Link key={link.to} to={link.to}>{link.label}</Link>
+          ))}
+          <Link to="/cart">Cart ({cartCount})</Link>
+          {isStaff && <Link to="/admin/dashboard">Admin portal</Link>}
+          {!user && (
+            <>
+              <Link to="/login">Log in</Link>
+              <Link to="/register">Create account</Link>
+            </>
+          )}
+        </nav>
+      </Drawer>
     </Layout>
   );
 }

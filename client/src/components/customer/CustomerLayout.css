@@ -1,0 +1,327 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * STOREFRONT LAYOUT STYLES
+ *
+ * WHAT THIS FILE DOES:
+ * Styles the storefront chrome — promo strip, sticky header, content well, footer,
+ * and mobile drawer nav. Class names are prefixed `cust-`.
+ *
+ * HOW IT FITS INTO THE APP:
+ * Imported by components/customer/CustomerLayout.jsx. Values come from tokens.css.
+ * ----------------------------------------------------------------------------------
+ */
+
+.cust-shell {
+  min-height: 100vh;
+  background: var(--tint);
+}
+
+/* -------------------------------------------------------------- PROMO STRIP */
+
+.cust-promo {
+  padding: 8px var(--s-4);
+  text-align: center;
+  font-size: var(--t-2xs);
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.92);
+  background: var(--grad-brand);
+  background-size: 200% 200%;
+}
+
+/* ------------------------------------------------------------------- HEADER */
+
+.cust-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(160%) blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.cust-header-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  height: 66px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 var(--s-6);
+}
+
+.cust-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  flex: none;
+}
+
+.cust-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  flex: none;
+}
+
+.cust-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent-teal), var(--brand-500) 55%, var(--accent-violet));
+  color: #fff;
+  font-size: 15px;
+  flex: none;
+}
+
+.cust-logo-name {
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.cust-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+}
+
+.cust-nav-link {
+  position: relative;
+  font-size: var(--t-sm);
+  font-weight: 550;
+  color: var(--body);
+  text-decoration: none;
+  padding: 4px 0;
+  transition: color 0.16s ease;
+}
+
+.cust-nav-link:hover {
+  color: var(--brand-500);
+}
+
+.cust-nav-link.is-active {
+  color: var(--brand-600);
+  font-weight: 650;
+}
+
+/* Underline marker on the active nav item */
+.cust-nav-link.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  border-radius: var(--r-pill);
+  background: var(--brand-500);
+}
+
+.cust-search {
+  flex: 1;
+  max-width: 380px;
+  margin-inline: auto;
+}
+
+.cust-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: none;
+  margin-left: auto;
+}
+
+.cust-cart {
+  display: inline-flex;
+}
+
+.cust-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.cust-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 12px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.cust-profile:hover {
+  background: var(--tint);
+  border-color: var(--line);
+}
+
+.cust-profile-name {
+  font-size: var(--t-xs);
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.cust-menu-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cust-menu-identity strong {
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+
+.cust-menu-identity span {
+  font-size: var(--t-2xs);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ CONTENT */
+
+.cust-content {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--s-8) var(--s-6) var(--s-12);
+  min-height: calc(100vh - 340px);
+}
+
+/* ------------------------------------------------------------------- FOOTER */
+
+.cust-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  margin-top: var(--s-12);
+}
+
+.cust-footer-inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-8);
+  flex-wrap: wrap;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--s-10) var(--s-6) var(--s-8);
+}
+
+.cust-footer-brand p {
+  margin: var(--s-3) 0 0;
+  font-size: var(--t-sm);
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+.cust-footer-links {
+  display: flex;
+  gap: var(--s-6);
+  flex-wrap: wrap;
+}
+
+.cust-footer-links a {
+  font-size: var(--t-sm);
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.16s ease;
+}
+
+.cust-footer-links a:hover {
+  color: var(--brand-500);
+}
+
+.cust-footer-base {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--s-5) var(--s-6);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-2xs);
+  color: var(--muted);
+}
+
+/* -------------------------------------------------------------- MOBILE NAV */
+
+.cust-burger {
+  display: none !important;
+}
+
+.cust-mobile-nav {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.cust-mobile-nav a {
+  padding: var(--s-3) var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--t-base);
+  font-weight: 550;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.16s ease;
+}
+
+.cust-mobile-nav a:hover {
+  background: var(--brand-50);
+  color: var(--brand-600);
+}
+
+/* --------------------------------------------------------------- RESPONSIVE */
+
+@media (max-width: 1080px) {
+  .cust-search {
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 900px) {
+  .cust-nav,
+  .cust-search {
+    display: none;
+  }
+
+  .cust-burger {
+    display: inline-flex !important;
+  }
+
+  .cust-header-left {
+    gap: var(--s-3);
+  }
+
+  .cust-content {
+    padding: var(--s-6) var(--s-4) var(--s-10);
+  }
+
+  .cust-header-inner {
+    padding: 0 var(--s-4);
+    gap: var(--s-3);
+  }
+}
+
+@media (max-width: 560px) {
+  .cust-profile-name {
+    display: none;
+  }
+
+  .cust-footer-inner {
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+
+  .cust-footer-base {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -2,6 +2,10 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, Spin } from 'antd';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import antdTheme from './theme/antdTheme';
+
+// Public Marketing Page
+import Landing from './pages/Landing';
 
 // Auth Pages
 import Login from './pages/Login';
@@ -69,37 +73,14 @@ const RoleRoute = ({ children, allowedRoles }) => {
 
 export default function App() {
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#3651A5', // Enterprise Indigo
-          borderRadius: 6,         // 6px border radius
-          fontFamily: 'Inter, sans-serif',
-          colorBgContainer: '#ffffff',
-          colorBgLayout: '#F5F6F8',
-          colorText: '#1F2937',
-          colorTextSecondary: '#6B7280',
-        },
-        components: {
-          Button: {
-            controlHeight: 36,
-          },
-          Input: {
-            controlHeight: 36,
-          },
-          Select: {
-            controlHeight: 36,
-          },
-          Table: {
-            headerBg: '#F9FAFB',
-            headerColor: '#374151',
-          },
-        },
-      }}
-    >
+    <ConfigProvider theme={antdTheme}>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/* Public marketing homepage. Sits outside CustomerLayout because it
+                renders its own full-bleed nav, hero, and footer. */}
+            <Route path="/" element={<Landing />} />
+
             {/* Public Auth Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -128,9 +109,11 @@ export default function App() {
               <Route path="profile" element={<Profile />} />
             </Route>
 
-            {/* Customer Facing Store Routes */}
+            {/* Customer Facing Store Routes.
+                Note there is no index route here: '/' is the marketing Landing page
+                above, and the catalog now lives at '/products'. */}
             <Route path="/" element={<CustomerLayout />}>
-              <Route index element={<Home />} />
+              <Route path="products" element={<Home />} />
               <Route path="products/:id" element={<ProductDetail />} />
               <Route path="cart" element={<Cart />} />
               <Route

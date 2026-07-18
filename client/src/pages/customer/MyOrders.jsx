@@ -1,18 +1,38 @@
+/**
+ * ----------------------------------------------------------------------------------
+ * CUSTOMER ORDER HISTORY
+ *
+ * WHAT THIS FILE DOES:
+ * Lists the signed-in customer's rental bookings as cards, and opens a detail drawer
+ * showing the order lines — including any automatically posted late-fee line — plus
+ * the tax breakdown and total.
+ *
+ * HOW IT FITS INTO THE APP:
+ * Routed at '/my-orders' behind the auth guard. The backend scopes GET /orders to the
+ * signed-in customer, so no client-side filtering by user is needed.
+ *
+ * WHERE TO CHANGE THINGS:
+ *   - Card layout lives in storefront.css under the `.sf-order` rules.
+ *   - Status colours are mapped centrally in components/ui ORDER_STATUS_TONE.
+ * ----------------------------------------------------------------------------------
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Typography, Table, Tag, Button, Spin, Result, Space, Modal, Card } from 'antd';
-import { EyeOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { Button, Spin, Result, Modal, Table } from 'antd';
+import { EyeOutlined, ProfileOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../../api/axios';
+import { PageHeader, EmptyState, StatusPill, Surface, formatCurrency } from '../../components/ui';
+import './storefront.css';
 
-const { Title, Text } = Typography;
+// Tax rate shown on the order detail breakdown, matching the backend calculation
+const TAX_LABEL = 'Tax (18%)';
 
 const MyOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -21,164 +41,192 @@ const MyOrders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // The backend automatically filters orders for the logged-in customer when role is CUSTOMER
+      // The backend filters to the signed-in customer when the role is CUSTOMER
       const response = await api.get('/orders');
       setOrders(response.data?.data || []);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
-      setError('Could not load your order history at this time.');
+      setError('Could not load your order history right now.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'QUOTATION': return 'default';
-      case 'QUOTATION_SENT': return 'cyan';
-      case 'CONFIRMED': return 'blue';
-      case 'PICKED_UP': return 'orange';
-      case 'RETURNED': return 'success';
-      case 'CANCELLED': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const handleView = (order) => {
-    setSelectedOrder(order);
-    setIsModalVisible(true);
-  };
-
-  const columns = [
+  /** Line-item columns for the detail modal. */
+  const lineColumns = [
+    { title: 'Description', dataIndex: 'description', key: 'description' },
     {
-      title: 'Order Ref',
-      dataIndex: 'reference',
-      key: 'reference',
-      render: (text, record) => <Text strong style={{ color: '#3651A5' }}>{text}</Text>,
+      title: 'Type',
+      dataIndex: 'lineType',
+      key: 'lineType',
+      render: (type) => {
+        // Late fee lines are the ones the system posts on a late return
+        const tone = type === 'RENTAL' ? 'info' : type === 'DEPOSIT' ? 'neutral' : 'warning';
+        return <span className={`pill pill-${tone} pill-plain`}>{type}</span>;
+      },
     },
     {
-      title: 'Booking Date',
-      dataIndex: 'createdAt',
-      key: 'date',
-      render: (text) => text ? dayjs(text).format('MMM DD, YYYY') : 'N/A',
+      title: 'Qty',
+      dataIndex: 'qty',
+      key: 'qty',
+      align: 'right',
+      render: (qty, record) => <span className="u-nums">{record.lineType === 'DEPOSIT' ? '—' : qty}</span>,
     },
     {
-      title: 'Rental Total',
-      dataIndex: 'total',
-      key: 'total',
-      render: (amount) => <span className="tabular-numbers">₹{amount.toFixed(2)}</span>,
+      title: 'Unit rate',
+      dataIndex: 'unitPrice',
+      key: 'unitPrice',
+      align: 'right',
+      render: (value) => <span className="u-nums">{formatCurrency(value)}</span>,
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)} className="status-tag">
-          {status?.replace('_', ' ')}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_, record) => (
-        <Button type="link" icon={<EyeOutlined />} onClick={() => handleView(record)} style={{ padding: 0 }}>
-          View Details
-        </Button>
-      ),
+      title: 'Subtotal',
+      dataIndex: 'subtotal',
+      key: 'subtotal',
+      align: 'right',
+      render: (value) => <strong className="u-nums">{formatCurrency(value)}</strong>,
     },
   ];
 
   if (error) {
-    return <Result status="error" title="Error" subTitle={error} />;
+    return <Result status="error" title="Something went wrong" subTitle={error} />;
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', padding: '120px 0' }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
   return (
-    <div className="fadeIn-animation" style={{ padding: '0 8px 24px 8px', maxWidth: '1200px', margin: '0 auto' }}>
-      <Title level={4} style={{ color: '#1F2937', marginBottom: '24px' }}>My Rental Bookings</Title>
-      
-      <Card bordered={false} className="enterprise-card" style={{ padding: 0 }}>
-        <Table 
-          columns={columns} 
-          dataSource={orders} 
-          rowKey="id"
-          loading={loading}
-          size="small"
-          className="dense-table"
-          pagination={{ pageSize: 10 }}
-        />
-      </Card>
+    <div className="page">
+      <PageHeader
+        title="My rentals"
+        subtitle="Every booking you've made, with its current status and totals."
+      />
 
-      <Modal 
-        title={<Text strong style={{ fontSize: 16 }}>Rental Order {selectedOrder?.reference}</Text>} 
-        open={isModalVisible} 
-        onCancel={() => setIsModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setIsModalVisible(false)}>Close</Button>
-        ]}
-        width={700}
+      {orders.length === 0 ? (
+        <Surface pad={false}>
+          <EmptyState
+            icon={<ProfileOutlined />}
+            title="No rentals yet"
+            text="Once you book equipment, your orders and their return dates will appear here."
+            actionLabel="Browse the catalog"
+            to="/products"
+          />
+        </Surface>
+      ) : (
+        <div className="sf-orders">
+          {orders.map((order) => {
+            // Surface the auto-posted late fee if the backend added one
+            const lateFeeLine = (order.lines || []).find((line) => line.lineType === 'LATE_FEE');
+
+            return (
+              <article className="sf-order" key={order.id}>
+                <header className="sf-order-head">
+                  <div>
+                    <div className="sf-order-ref">{order.reference}</div>
+                    <div className="sf-order-date">
+                      Booked {dayjs(order.createdAt).format('DD MMM YYYY')}
+                    </div>
+                  </div>
+                  <StatusPill status={order.status} />
+                </header>
+
+                <div className="sf-order-body">
+                  <div className="sf-order-figures">
+                    <div>
+                      <span className="sf-figure-label">Rental period</span>
+                      <span className="sf-figure-value" style={{ fontSize: 'var(--t-sm)' }}>
+                        {dayjs(order.rentalStart).format('DD MMM')} – {dayjs(order.rentalEnd).format('DD MMM YYYY')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="sf-figure-label">Total</span>
+                      <span className="sf-figure-value">{formatCurrency(order.total)}</span>
+                    </div>
+                    {lateFeeLine && (
+                      <div>
+                        <span className="sf-figure-label">Late fee</span>
+                        <span className="sf-figure-value is-fee">
+                          {formatCurrency(lateFeeLine.subtotal)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button icon={<EyeOutlined />} onClick={() => setSelectedOrder(order)}>
+                    View details
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal
+        title={`Rental order ${selectedOrder?.reference || ''}`}
+        open={Boolean(selectedOrder)}
+        onCancel={() => setSelectedOrder(null)}
+        footer={<Button onClick={() => setSelectedOrder(null)}>Close</Button>}
+        width={760}
         destroyOnClose
       >
         {selectedOrder && (
-          <div style={{ marginTop: 16 }}>
-            <Space direction="vertical" style={{ width: '100%', marginBottom: 20 }} size={4}>
-              <Text strong>Order Ref: <Text type="secondary">{selectedOrder.reference}</Text></Text>
-              <Text strong>Status: <Tag color={getStatusColor(selectedOrder.status)} className="status-tag">{(selectedOrder.status || '').replace('_', ' ')}</Tag></Text>
-              <Text strong>Rental Period: <Text type="secondary">{dayjs(selectedOrder.rentalStart).format('MMM DD, YYYY HH:mm')} - {dayjs(selectedOrder.rentalEnd).format('MMM DD, YYYY HH:mm')}</Text></Text>
-              {selectedOrder.actualReturn && (
-                <Text strong>Actual Return: <Text type="secondary">{dayjs(selectedOrder.actualReturn).format('MMM DD, YYYY HH:mm')}</Text></Text>
-              )}
-            </Space>
+          <>
+            <div className="sf-spec-grid" style={{ marginTop: 0 }}>
+              <div className="sf-spec">
+                <span className="sf-spec-label">Status</span>
+                <StatusPill status={selectedOrder.status} />
+              </div>
+              <div className="sf-spec">
+                <span className="sf-spec-label">Booked on</span>
+                <span className="sf-spec-value">{dayjs(selectedOrder.createdAt).format('DD MMM YYYY')}</span>
+              </div>
+              <div className="sf-spec">
+                <span className="sf-spec-label">Rental period</span>
+                <span className="sf-spec-value">
+                  {dayjs(selectedOrder.rentalStart).format('DD MMM HH:mm')} – {dayjs(selectedOrder.rentalEnd).format('DD MMM HH:mm')}
+                </span>
+              </div>
+              <div className="sf-spec">
+                <span className="sf-spec-label">Actual return</span>
+                <span className="sf-spec-value">
+                  {selectedOrder.actualReturn
+                    ? dayjs(selectedOrder.actualReturn).format('DD MMM HH:mm')
+                    : 'Not returned yet'}
+                </span>
+              </div>
+            </div>
 
-            <Title level={5} style={{ fontSize: 14, margin: '16px 0 8px 0' }}>Booking Items</Title>
-            <Table 
+            <h3 className="u-h3" style={{ margin: 'var(--s-5) 0 var(--s-3)' }}>Order lines</h3>
+            <Table
               dataSource={selectedOrder.lines || []}
+              columns={lineColumns}
               rowKey="id"
               pagination={false}
               size="small"
               className="dense-table"
-              columns={[
-                {
-                  title: 'Description',
-                  dataIndex: 'description',
-                  key: 'description',
-                },
-                {
-                  title: 'Line Type',
-                  dataIndex: 'lineType',
-                  key: 'lineType',
-                  render: type => <Tag color={type === 'RENTAL' ? 'blue' : type === 'DEPOSIT' ? 'orange' : 'red'}>{type}</Tag>
-                },
-                {
-                  title: 'Qty',
-                  dataIndex: 'qty',
-                  key: 'qty',
-                  render: (qty, record) => <span className="tabular-numbers">{record.lineType === 'DEPOSIT' ? '-' : qty}</span>
-                },
-                {
-                  title: 'Unit Rate',
-                  dataIndex: 'unitPrice',
-                  key: 'unitPrice',
-                  render: (val) => <span className="tabular-numbers">₹{val.toFixed(2)}</span>
-                },
-                {
-                  title: 'Subtotal',
-                  dataIndex: 'subtotal',
-                  key: 'subtotal',
-                  render: (val) => <span className="tabular-numbers" style={{ fontWeight: 500 }}>₹{val.toFixed(2)}</span>
-                }
-              ]}
-              style={{ marginBottom: 20 }}
             />
-            
-            <div style={{ textAlign: 'right', borderTop: '1px solid #E5E7EB', paddingTop: 12 }}>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>Untaxed Amount: <span className="tabular-numbers">₹{selectedOrder.untaxed.toFixed(2)}</span></div>
-              <div style={{ fontSize: 13, marginBottom: 8 }}>Tax Amount (18%): <span className="tabular-numbers">₹{selectedOrder.tax.toFixed(2)}</span></div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>
-                Total Due: <span className="tabular-numbers" style={{ color: '#3651A5' }}>₹{selectedOrder.total.toFixed(2)}</span>
+
+            <div style={{ marginTop: 'var(--s-5)', marginLeft: 'auto', maxWidth: 300 }}>
+              <div className="sf-summary-row">
+                <span>Untaxed amount</span>
+                <strong>{formatCurrency(selectedOrder.untaxed)}</strong>
+              </div>
+              <div className="sf-summary-row">
+                <span>{TAX_LABEL}</span>
+                <strong>{formatCurrency(selectedOrder.tax)}</strong>
+              </div>
+              <div className="sf-summary-row sf-summary-total">
+                <span>Total</span>
+                <strong>{formatCurrency(selectedOrder.total)}</strong>
               </div>
             </div>
-          </div>
+          </>
         )}
       </Modal>
     </div>
