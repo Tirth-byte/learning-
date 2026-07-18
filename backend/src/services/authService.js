@@ -139,7 +139,7 @@ class AuthService {
     });
 
     // Step 9: Generate a fresh signing token for client auto-login
-    const generatedSessionToken = this.generateToken(createdUserProfile);
+    const generatedSessionToken = await this.generateToken(createdUserProfile);
 
     return { user: createdUserProfile, token: generatedSessionToken };
   }
@@ -170,7 +170,7 @@ class AuthService {
       throw { statusCode: 401, message: 'Invalid User ID or Password' };
     }
 
-    const sessionToken = this.generateToken(userRecord);
+    const sessionToken = await this.generateToken(userRecord);
 
     const userProfileResponse = {
       id: userRecord.id,
@@ -209,19 +209,46 @@ class AuthService {
   }
 
   /**
-   * Generate an signed JWT session token with encrypted properties.
+   * Generate a signed JWT session token and store it in the database.
    * 
    * Input:
    *   - user: User account entity.
    * Output:
    *   - Signed secure string.
    */
-  generateToken(user) {
-    return jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+  async generateToken(user) {
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role,
+        nonce: Math.random().toString(36).substring(2, 15) + Date.now().toString(36)
+      },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
+    
+    // Store in the database
+    // Default expiration date to 24 hours from now
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.jwtToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt
+      }
+    });
+
+    return token;
+  }
+
+  /**
+   * Remove a token from the database to log out the user.
+   */
+  async logout(token) {
+    await prisma.jwtToken.deleteMany({
+      where: { token }
+    }).catch(() => {});
   }
 
   /**
@@ -446,7 +473,7 @@ class AuthService {
 
     if (userRecord) {
       // User exists -> Log them in immediately and return token
-      const sessionToken = this.generateToken(userRecord);
+      const sessionToken = await this.generateToken(userRecord);
       const userProfileResponse = {
         id: userRecord.id,
         email: userRecord.email,

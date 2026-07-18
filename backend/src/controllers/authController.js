@@ -177,6 +177,22 @@ class AuthController {
       next(error);
     }
   }
+
+  async logout(req, res, next) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        await authService.logout(token);
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Logged out successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AuthController();

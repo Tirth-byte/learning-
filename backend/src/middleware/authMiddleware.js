@@ -19,6 +19,15 @@ async function resolveUser(authHeader) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Verify token exists and is valid in database
+    const dbToken = await prisma.jwtToken.findUnique({
+      where: { token }
+    });
+    if (!dbToken || dbToken.revoked || dbToken.expiresAt < new Date()) {
+      return null;
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, name: true, role: true },

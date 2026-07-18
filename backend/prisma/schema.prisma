@@ -97,6 +97,7 @@ model User {
   products       Product[]      @relation("VendorProducts")
   notifications  Notification[]
   invoices       Invoice[]      @relation("CustomerInvoices")
+  tokens         JwtToken[]
 }
 
 model Category {
@@ -136,6 +137,9 @@ model Product {
   orderLines       RentalOrderLine[]
   attributes       ProductAttribute[]
   invoiceLines     InvoiceLine[]
+
+  @@index([categoryId])
+  @@index([vendorId])
 }
 
 model ProductAttribute {
@@ -149,6 +153,8 @@ model ProductAttribute {
   // Relations
   product     Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
   values      ProductAttributeValue[]
+
+  @@index([productId])
 }
 
 model ProductAttributeValue {
@@ -160,6 +166,8 @@ model ProductAttributeValue {
 
   // Relations
   attribute   ProductAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@index([attributeId])
 }
 
 model Pricelist {
@@ -222,6 +230,11 @@ model RentalOrder {
   invoice         Invoice?
   payments        Payment[]
   notifications   Notification[]
+
+  @@index([customerId])
+  @@index([vendorId])
+  @@index([pricelistId])
+  @@index([status])
 }
 
 model RentalOrderLine {
@@ -243,6 +256,9 @@ model RentalOrderLine {
   // Relations
   order       RentalOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product     Product?    @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Invoice {
@@ -262,6 +278,9 @@ model Invoice {
   order       RentalOrder      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customer    User             @relation("CustomerInvoices", fields: [customerId], references: [id])
   lines       InvoiceLine[]
+
+  @@index([customerId])
+  @@index([status])
 }
 
 model InvoiceLine {
@@ -280,6 +299,9 @@ model InvoiceLine {
   // Relations
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product     Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@index([productId])
 }
 
 model Payment {
@@ -294,6 +316,8 @@ model Payment {
 
   // Relations
   order     RentalOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 model Notification {
@@ -308,6 +332,9 @@ model Notification {
   // Relations
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   order     RentalOrder? @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
 }
 
 model Settings {
@@ -328,4 +355,21 @@ model Otp {
   expiresAt  DateTime
   verified   Boolean  @default(false)
   createdAt  DateTime @default(now())
+
+  @@index([identifier])
+}
+
+model JwtToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
