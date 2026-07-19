@@ -70,7 +70,7 @@ const Register = () => {
     setLoading(true);
     setError(null);
     try {
-      await api.post('/auth/register/start', {
+      const response = await api.post('/auth/register/start', {
         name: values.name,
         email: values.email,
         phone: values.phone,
@@ -84,7 +84,14 @@ const Register = () => {
       setCountdown(30);
       setOtpCode(['', '', '', '', '', '']);
       setTimeout(() => otpRefs.current[0]?.current?.focus(), 100);
-      message.success('Verification OTP code sent to your email.');
+
+      // In dev mode, show the code returned in response.data.code
+      if (response.data?.code) {
+        console.log(`[Demo Dev Mode] Received OTP code: ${response.data.code}`);
+        message.info(`[Demo OTP] Code: ${response.data.code}`);
+      } else {
+        message.success('Verification OTP code sent to your email.');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to start registration.');
     } finally {
