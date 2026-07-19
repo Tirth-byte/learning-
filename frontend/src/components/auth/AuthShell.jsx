@@ -61,10 +61,7 @@ const AuthShell = ({
               style={{ 
                 width: '100px', 
                 height: '100px', 
-                borderRadius: '16px', 
-                boxShadow: '0 12px 32px rgba(11, 21, 51, 0.3)',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                background: '#fff'
+                filter: 'drop-shadow(0 12px 24px rgba(11, 21, 51, 0.4))'
               }} 
             />
           </div>
