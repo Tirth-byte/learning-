@@ -15,8 +15,26 @@
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const twilio = require('twilio');
 const prisma = require('../config/prisma');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/env');
+
+// Initialize Twilio Client (gracefully handle missing credentials)
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
+
+// Initialize Nodemailer SMTP transporter
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.resend.com',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
 
 // ----------------------------------------------------------------------------------
 // CONFIGURATION CONSTANTS
@@ -415,9 +433,43 @@ class AuthService {
     // Console logging
     console.log(`[OTP SERVICE] Generated OTP for ${identifier}: ${otpCode}`);
 
-    // TODO: Integrate real SMS/Email delivery provider here
-    // Example SMS: smsGateway.send(identifier, `Your Odoo Rent OTP is ${otpCode}`);
-    // Example Email: emailGateway.send(identifier, 'Your Verification Code', `Your OTP is ${otpCode}`);
+    // Real Email delivery
+    if (isEmail) {
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        try {
+          await emailTransporter.sendMail({
+            from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+            to: identifier,
+            subject: 'Your Odoo Rent Verification Code',
+            text: `Your verification code is ${otpCode}. It is valid for 5 minutes.`,
+            html: `<p>Your verification code is <strong>${otpCode}</strong>. It is valid for 5 minutes.</p>`
+          });
+          console.log(`[OTP SERVICE] Real OTP email sent successfully to ${identifier}`);
+        } catch (err) {
+          console.error('[OTP SERVICE] Failed to send real OTP email:', err);
+        }
+      } else {
+        console.log(`[OTP SERVICE] SMTP not configured. Mocking email delivery to console.`);
+      }
+    }
+
+    // Real SMS delivery
+    if (isPhone) {
+      if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
+        try {
+          await twilioClient.messages.create({
+            body: `Your Odoo Rent verification code is ${otpCode}. Valid for 5 minutes.`,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: identifier
+          });
+          console.log(`[OTP SERVICE] Real OTP SMS sent successfully to ${identifier}`);
+        } catch (err) {
+          console.error('[OTP SERVICE] Failed to send real OTP SMS:', err);
+        }
+      } else {
+        console.log(`[OTP SERVICE] Twilio not configured. Mocking SMS delivery to console.`);
+      }
+    }
 
     return {
       success: true,
