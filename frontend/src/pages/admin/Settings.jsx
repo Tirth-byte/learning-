@@ -16,6 +16,8 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Card, Form, Input, Button, Tabs, message, Spin, Row, Col } from 'antd';
 import { SaveOutlined, AppstoreOutlined, AccountBookOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 
 const { Title } = Typography;
@@ -36,9 +38,15 @@ const TOAST_ERROR_ALERT = "Failed to update system settings";
 
 
 const Settings = () => {
+  const { user } = useAuth();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Restrict settings page to ADMIN users only
+  if (user?.role !== 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   /**
    * Load configurations from the database on page mount.

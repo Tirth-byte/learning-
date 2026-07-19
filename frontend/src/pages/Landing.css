@@ -308,12 +308,21 @@
   color: var(--lp-ink);
 }
 
+.lp-nav-solid .lp-nav-ghost:hover {
+  color: var(--lp-indigo);
+}
+
 .lp-nav-ghost {
   font-size: 0.9375rem;
   font-weight: 600;
   color: #fff;
   text-decoration: none;
-  padding: 8px 4px;
+  padding: 8px 12px;
+  transition: opacity 0.18s ease, color 0.18s ease;
+}
+
+.lp-nav-ghost:hover {
+  opacity: 0.8;
 }
 
 /* -------------------------------------------------------------------- HERO */
@@ -916,6 +925,10 @@
 .lp-role-featured {
   border-color: transparent;
   box-shadow: 0 0 0 2px var(--lp-indigo), 0 16px 36px -14px rgba(54, 81, 165, 0.35);
+}
+
+.lp-role-featured:hover {
+  box-shadow: 0 0 0 2px var(--lp-indigo), 0 20px 48px -12px rgba(54, 81, 165, 0.45);
 }
 
 .lp-role-tag {
