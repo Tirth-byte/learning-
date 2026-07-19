@@ -529,14 +529,18 @@ class AuthService {
     if (isEmail) {
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         try {
+          const recipient = (process.env.EMAIL_FROM === 'onboarding@resend.dev' || !process.env.EMAIL_FROM)
+            ? (process.env.EMAIL_TO_DEV || 'tirthkavar5@gmail.com')
+            : identifier;
+
           await emailTransporter.sendMail({
             from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-            to: identifier,
+            to: recipient,
             subject: 'Your Odoo Rent Verification Code',
-            text: `Your verification code is ${otpCode}. It is valid for 5 minutes.`,
-            html: `<p>Your verification code is <strong>${otpCode}</strong>. It is valid for 5 minutes.</p>`
+            text: `Your verification code is ${otpCode}. It is valid for 5 minutes. (Requested by ${identifier})`,
+            html: `<p>Your verification code is <strong>${otpCode}</strong>. It is valid for 5 minutes.</p><p style="color:gray;font-size:12px;margin-top:20px;">This email was sent to ${recipient} because it was requested by ${identifier} under the Resend sandbox environment.</p>`
           });
-          console.log(`[OTP SERVICE] Real OTP email sent successfully to ${identifier}`);
+          console.log(`[OTP SERVICE] Real OTP email sent successfully to ${recipient} (Requested by ${identifier})`);
         } catch (err) {
           console.error('[OTP SERVICE] Failed to send real OTP email:', err);
         }
