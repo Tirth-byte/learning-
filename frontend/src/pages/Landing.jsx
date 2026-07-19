@@ -285,45 +285,38 @@ const LandingHero = ({ onBrowse }) => (
         <p className="lp-hero-note">No setup fee · Deposits refunded in full on time</p>
       </div>
 
-      {/* Mock order summary & mascot character */}
-      <div style={{ position: 'relative' }}>
-        {/* Mascot helper floating overlapping the panel */}
-        <div className="lp-hero-mascot-wrapper">
-          <img src="/mascot.png" alt="Odoo Rent Mascot" className="lp-hero-mascot" />
+      {/* Mock order summary — illustrative figures, not live data */}
+      <div className="lp-panel" role="img" aria-label="Example rental order settled after a late return">
+        <div className="lp-panel-head">
+          <div>
+            <div className="lp-panel-title">Order R-2041 · Projector</div>
+            <div className="lp-panel-sub">4 hour rental · returned 4h 30m</div>
+          </div>
+          <span className="lp-chip lp-chip-amber">Returned late</span>
         </div>
 
-        <div className="lp-panel" role="img" aria-label="Example rental order settled after a late return">
-          <div className="lp-panel-head">
-            <div>
-              <div className="lp-panel-title">Order R-2041 · Projector</div>
-              <div className="lp-panel-sub">4 hour rental · returned 4h 30m</div>
-            </div>
-            <span className="lp-chip lp-chip-amber">Returned late</span>
+        <div className="lp-panel-body">
+          <div className="lp-row">
+            <span className="lp-row-label">Rental charge</span>
+            <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}1,200.00</span>
           </div>
-
-          <div className="lp-panel-body">
-            <div className="lp-row">
-              <span className="lp-row-label">Rental charge</span>
-              <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}1,200.00</span>
-            </div>
-            <div className="lp-row">
-              <span className="lp-row-label">
-                Security deposit
-                <span className="lp-row-hint">Held, not recognised as revenue</span>
-              </span>
-              <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}2,000.00</span>
-            </div>
-            <div className="lp-row lp-row-flag">
-              <span className="lp-row-label">
-                Late fees
-                <span className="lp-row-hint">1 hr × {DISPLAY_CURRENCY_SYMBOL}150 · added automatically</span>
-              </span>
-              <span className="lp-row-value">+{DISPLAY_CURRENCY_SYMBOL}150.00</span>
-            </div>
-            <div className="lp-row lp-row-total">
-              <span className="lp-row-label">Deposit refunded</span>
-              <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}1,850.00</span>
-            </div>
+          <div className="lp-row">
+            <span className="lp-row-label">
+              Security deposit
+              <span className="lp-row-hint">Held, not recognised as revenue</span>
+            </span>
+            <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}2,000.00</span>
+          </div>
+          <div className="lp-row lp-row-flag">
+            <span className="lp-row-label">
+              Late fees
+              <span className="lp-row-hint">1 hr × {DISPLAY_CURRENCY_SYMBOL}150 · added automatically</span>
+            </span>
+            <span className="lp-row-value">+{DISPLAY_CURRENCY_SYMBOL}150.00</span>
+          </div>
+          <div className="lp-row lp-row-total">
+            <span className="lp-row-label">Deposit refunded</span>
+            <span className="lp-row-value">{DISPLAY_CURRENCY_SYMBOL}1,850.00</span>
           </div>
         </div>
       </div>

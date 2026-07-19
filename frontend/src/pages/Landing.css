@@ -587,30 +587,6 @@
   font-weight: 750;
 }
 
-/* Floating mascot element */
-.lp-hero-mascot-wrapper {
-  position: absolute;
-  top: -85px;
-  right: -25px;
-  z-index: 10;
-  pointer-events: none;
-  animation: lp-mascot-float 6s ease-in-out infinite;
-}
-
-.lp-hero-mascot {
-  width: 140px;
-  height: 140px;
-  filter: drop-shadow(0 12px 28px rgba(11, 21, 51, 0.45));
-}
-
-@keyframes lp-mascot-float {
-  0%, 100% {
-    transform: translateY(0) rotate(1.5deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(-1.5deg);
-  }
-}
 
 /* --------------------------------------------------------------- TRUST BAR */
 

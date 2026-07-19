@@ -231,6 +231,8 @@ class ProductService {
       lateFeePerHour,
       images,
       published,
+      rentalCount,
+      totalRentalHours,
     } = productData;
 
     // Rule 4: Reject negative or zero quantities, prices, deposits, and late-fee rates on input
@@ -269,6 +271,8 @@ class ProductService {
         lateFeePerHour: lateFeePerHour !== undefined ? parseFloat(lateFeePerHour) : undefined,
         images,
         published,
+        rentalCount: rentalCount !== undefined ? parseInt(rentalCount, 10) : undefined,
+        totalRentalHours: totalRentalHours !== undefined ? parseInt(totalRentalHours, 10) : undefined,
       },
       include: {
         category: true,

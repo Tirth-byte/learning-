@@ -54,17 +54,6 @@ const AuthShell = ({
         </Link>
 
         <div>
-          <div style={{ marginBottom: '24px', display: 'flex' }}>
-            <img 
-              src="/mascot.png" 
-              alt="Rental Helper Mascot" 
-              style={{ 
-                width: '100px', 
-                height: '100px', 
-                filter: 'drop-shadow(0 12px 24px rgba(11, 21, 51, 0.4))'
-              }} 
-            />
-          </div>
           <h2 className="auth-panel-title">{panelTitle}</h2>
           <p className="auth-panel-text">{panelText}</p>
 
