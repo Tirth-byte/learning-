@@ -62,8 +62,10 @@ class AuthService {
    * Output:
    *   - Returns an object containing the new user details and active session token.
    */
-  async register({ email, password, confirmPassword, name, role, phone, address, companyName, gstNo, isOtpSignup, otpIdentifier }) {
-    
+  /**
+   * Start user registration: validate fields and send verification OTP.
+   */
+  async registerStart({ email, password, confirmPassword, name, phone }) {
     // Step 1: Validate required fields are filled out
     if (!email || !password || !confirmPassword || !name) {
       throw { statusCode: 400, message: 'Required fields: email, password, confirmPassword, name' };
@@ -97,22 +99,66 @@ class AuthService {
       };
     }
 
-    // Step 5.5: Verify OTP for registration if signed up via OTP path
-    if (isOtpSignup && otpIdentifier) {
-      const verifiedOtp = await prisma.otp.findFirst({
-        where: {
-          identifier: otpIdentifier,
-          verified: true,
-          createdAt: { gt: new Date(Date.now() - 15 * 60 * 1000) } // 15 mins
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-      if (!verifiedOtp) {
-        throw { statusCode: 400, message: 'OTP verification is required' };
-      }
-      // Clean up used OTP
-      await prisma.otp.delete({ where: { id: verifiedOtp.id } }).catch(() => {});
+    // Step 6: Verify the email address does not already exist in database
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      throw { statusCode: 400, message: 'Email is already registered' };
     }
+
+    // If phone is provided, make sure it is not already registered
+    if (phone) {
+      const existingPhoneUser = await prisma.user.findUnique({ where: { phone } });
+      if (existingPhoneUser) {
+        throw { statusCode: 400, message: 'Phone number is already registered' };
+      }
+    }
+
+    // Trigger OTP sending
+    const otpResult = await this.sendOtp(email);
+
+    return { success: true, message: 'OTP sent to email successfully', code: otpResult.code };
+  }
+
+  /**
+   * Register a new user profile inside the database after validating fields and checking the verified OTP code.
+   * 
+   * Input:
+   *   - data: Object containing user registration inputs (email, passwords, name, phone, address, code).
+   * Output:
+   *   - Returns an object containing the new user details and active session token.
+   */
+  async register({ email, password, confirmPassword, name, role, phone, address, companyName, gstNo, code }) {
+    
+    // Step 1: Validate required fields are filled out
+    if (!email || !password || !confirmPassword || !name || !code) {
+      throw { statusCode: 400, message: 'Required fields: email, password, confirmPassword, name, code' };
+    }
+
+    // Step 2: Confirm password confirmation matches
+    if (password !== confirmPassword) {
+      throw { statusCode: 400, message: 'Passwords do not match' };
+    }
+
+    // Verify OTP first
+    const verifiedOtp = await prisma.otp.findFirst({
+      where: {
+        identifier: email,
+        code,
+        expiresAt: { gt: new Date() },
+        verified: false
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!verifiedOtp) {
+      throw { statusCode: 400, message: 'Invalid or expired OTP code' };
+    }
+
+    // Mark verified
+    await prisma.otp.update({
+      where: { id: verifiedOtp.id },
+      data: { verified: true }
+    });
 
     // Step 6: Verify the email address does not already exist in database
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -156,6 +202,9 @@ class AuthService {
       },
     });
 
+    // Clean up OTP record
+    await prisma.otp.delete({ where: { id: verifiedOtp.id } }).catch(() => {});
+
     // Step 9: Generate a fresh signing token for client auto-login
     const generatedSessionToken = await this.generateToken(createdUserProfile);
 
@@ -188,6 +237,47 @@ class AuthService {
       throw { statusCode: 401, message: 'Invalid User ID or Password' };
     }
 
+    // Generate and send OTP to user's email
+    const otpResult = await this.sendOtp(email);
+
+    return { requireOtp: true, email, code: otpResult.code };
+  }
+
+  /**
+   * Complete 2FA login by verifying OTP.
+   */
+  async loginVerify(email, code) {
+    if (!email || !code) {
+      throw { statusCode: 400, message: 'Email and OTP code are required' };
+    }
+
+    // Verify OTP first
+    const verifiedOtp = await prisma.otp.findFirst({
+      where: {
+        identifier: email,
+        code,
+        expiresAt: { gt: new Date() },
+        verified: false
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!verifiedOtp) {
+      throw { statusCode: 400, message: 'Invalid or expired OTP code' };
+    }
+
+    // Mark verified
+    await prisma.otp.update({
+      where: { id: verifiedOtp.id },
+      data: { verified: true }
+    });
+
+    // Find user
+    const userRecord = await prisma.user.findUnique({ where: { email } });
+    if (!userRecord) {
+      throw { statusCode: 404, message: 'User record not found' };
+    }
+
     const sessionToken = await this.generateToken(userRecord);
 
     const userProfileResponse = {
@@ -200,6 +290,9 @@ class AuthService {
       companyName: userRecord.companyName,
       gstNo: userRecord.gstNo,
     };
+
+    // Clean up OTP record
+    await prisma.otp.delete({ where: { id: verifiedOtp.id } }).catch(() => {});
 
     return { user: userProfileResponse, token: sessionToken };
   }

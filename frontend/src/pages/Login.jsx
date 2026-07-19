@@ -42,14 +42,13 @@ const DEMO_ACCOUNTS = [
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { login, loginWithToken } = useAuth();
+  const { loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [form] = Form.useForm();
 
-  // OTP Login States
-  const [loginMode, setLoginMode] = useState('password'); // 'password' or 'otp'
-  const [otpStep, setOtpStep] = useState('request'); // 'request' or 'verify'
-  const [identifier, setIdentifier] = useState('');
+  // Login Flow States
+  const [step, setStep] = useState('form'); // 'form' or 'otp'
+  const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(0);
 
@@ -66,60 +65,74 @@ const Login = () => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  /** Submit credentials and route by role. */
-  const onFinish = async (values) => {
+  // Handle password submission: authenticate and send OTP
+  const onFinishForm = async (values) => {
     setLoading(true);
     setError(null);
     try {
-      const loggedInUser = await login(values.email, values.password);
-      navigate(loggedInUser.role === 'CUSTOMER' ? '/products' : '/admin/dashboard');
+      const response = await api.post('/auth/login', {
+        email: values.email,
+        password: values.password,
+      });
+
+      if (response.data.data.requireOtp) {
+        setEmail(values.email);
+        setStep('otp');
+        setCountdown(30);
+        setOtpCode(['', '', '', '', '', '']);
+        setTimeout(() => otpRefs.current[0]?.current?.focus(), 100);
+        
+        // In dev mode, the code is returned in the API payload
+        if (response.data.data.code) {
+          console.log(`[Demo Dev Mode] Received OTP code: ${response.data.data.code}`);
+          message.info(`[Demo OTP] Code: ${response.data.data.code}`);
+        }
+      } else {
+        // Fallback: log in directly if 2FA was bypassed
+        const { token, user } = response.data.data;
+        loginWithToken(user, token);
+        message.success('Login successful');
+        navigate(user.role === 'CUSTOMER' ? '/products' : '/admin/dashboard');
+      }
     } catch (err) {
-      setError(err.message || 'Invalid email or password.');
+      setError(err.response?.data?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
   };
 
-  /** Send verification code */
-  const handleSendOtp = async () => {
-    if (!identifier) {
-      setError('Enter your email or phone number.');
-      return;
-    }
+  // Re-send OTP code
+  const handleResendOtp = async () => {
+    if (!email) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/auth/send-otp', { identifier });
+      const response = await api.post('/auth/send-otp', { identifier: email });
       if (response.data.code) {
         console.log(`[Demo Dev Mode] Received OTP code: ${response.data.code}`);
         message.info(`[Demo OTP] Code: ${response.data.code}`);
       }
-      setOtpStep('verify');
       setCountdown(30);
       setOtpCode(['', '', '', '', '', '']);
       setTimeout(() => otpRefs.current[0]?.current?.focus(), 100);
+      message.success('New verification code sent to your email.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send OTP.');
+      setError(err.response?.data?.message || 'Failed to resend OTP.');
     } finally {
       setLoading(false);
     }
   };
 
-  /** Verify code and login */
+  // Complete login with OTP code
   const handleVerifyOtp = async (codeStr) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/auth/verify-otp', { identifier, code: codeStr });
-      const { action, token, user } = response.data.data;
-      if (action === 'login') {
-        loginWithToken(user, token);
-        message.success('Login successful');
-        navigate(user.role === 'CUSTOMER' ? '/products' : '/admin/dashboard');
-      } else {
-        setError('Verification successful, but no account exists. Please sign up first.');
-        setLoginMode('password');
-      }
+      const response = await api.post('/auth/login/verify', { email, code: codeStr });
+      const { token, user } = response.data.data;
+      loginWithToken(user, token);
+      message.success('Login successful');
+      navigate(user.role === 'CUSTOMER' ? '/products' : '/admin/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired OTP code.');
       setOtpCode(['', '', '', '', '', '']);
@@ -150,29 +163,22 @@ const Login = () => {
     }
   };
 
-  /** Fill the form with a demo account and submit it immediately. */
+  // Fill and submit demo login
   const loginAsDemo = (account) => {
     form.setFieldsValue({ email: account.email, password: account.password });
-    onFinish({ email: account.email, password: account.password });
+    onFinishForm({ email: account.email, password: account.password });
   };
 
   return (
     <AuthShell
-      title={loginMode === 'password' ? 'Sign in' : 'OTP Sign in'}
-      subtitle={loginMode === 'password' ? 'Access your account to manage rentals, orders, and returns.' : 'Sign in instantly using a one-time code.'}
+      title="Sign in"
+      subtitle={step === 'form' ? 'Access your account to manage rentals, orders, and returns.' : 'Verify the OTP code sent to your email.'}
       footer={<>New here? <Link to="/register">Create an account</Link></>}
     >
-      {error && (
-        <Alert
-          message={error}
-          type="error"
-          showIcon
-          style={{ marginBottom: 'var(--s-5)' }}
-        />
-      )}
+      {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 'var(--s-5)' }} />}
 
-      {loginMode === 'password' ? (
-        <Form form={form} name="login" onFinish={onFinish} layout="vertical" requiredMark={false}>
+      {step === 'form' ? (
+        <Form form={form} name="login" onFinish={onFinishForm} layout="vertical" requiredMark={false}>
           <Form.Item
             name="email"
             label="Email address"
@@ -209,120 +215,68 @@ const Login = () => {
             />
           </Form.Item>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)', marginTop: 'var(--s-2)' }}>
-            <Button
-              type="default"
-              size="large"
-              onClick={() => {
-                setLoginMode('otp');
-                setOtpStep('request');
-              }}
-            >
-              Sign in with OTP
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              size="large"
-            >
-              Sign in
-            </Button>
-          </div>
+          <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ marginTop: 'var(--s-4)' }}>
+            Sign In
+          </Button>
         </Form>
       ) : (
-        <div>
-          {otpStep === 'request' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: 'var(--t-sm)', fontWeight: 650, color: 'var(--ink)' }}>Email or Phone number</label>
-                <Input
-                  size="large"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="name@company.com or 9876543210"
-                  prefix={<MailOutlined style={{ color: 'var(--faint)' }} />}
-                />
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{ textAlign: 'center', fontSize: 'var(--t-sm)', color: 'var(--body)' }}>
+            Enter the 6-digit code sent to <strong style={{ color: 'var(--ink)' }}>{email}</strong>
+          </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)' }}>
-                <Button
-                  type="default"
-                  size="large"
-                  onClick={() => setLoginMode('password')}
-                >
-                  Back to Password
-                </Button>
-                <Button
-                  type="primary"
-                  size="large"
-                  loading={loading}
-                  onClick={handleSendOtp}
-                >
-                  Send OTP
-                </Button>
-              </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0' }}>
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <input
+                key={idx}
+                ref={otpRefs.current[idx]}
+                type="text"
+                pattern="\d*"
+                maxLength={1}
+                value={otpCode[idx]}
+                onChange={(e) => handleOtpChange(e.target.value, idx)}
+                onKeyDown={(e) => handleKeyDown(e, idx)}
+                style={{
+                  width: 44,
+                  height: 48,
+                  fontSize: 20,
+                  textAlign: 'center',
+                  borderRadius: 6,
+                  border: '1px solid var(--line)',
+                  background: 'var(--surface)',
+                  fontWeight: '600',
+                  color: 'var(--ink)',
+                  outline: 'none'
+                }}
+              />
+            ))}
+          </div>
+
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            {countdown > 0 ? (
+              <span style={{ fontSize: 'var(--t-xs)', color: 'var(--muted)' }}>
+                Resend code in {countdown}s
+              </span>
+            ) : (
+              <Button type="link" style={{ padding: 0 }} onClick={handleResendOtp}>
+                Resend OTP code
+              </Button>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', width: '100%', marginTop: '8px' }}>
+              <Button
+                type="default"
+                size="large"
+                onClick={() => setStep('form')}
+              >
+                Back to Login Form
+              </Button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-              <div style={{ textAlign: 'center', fontSize: 'var(--t-sm)', color: 'var(--body)' }}>
-                Enter the 6-digit code sent to <strong style={{ color: 'var(--ink)' }}>{identifier}</strong>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0' }}>
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <input
-                    key={idx}
-                    ref={otpRefs.current[idx]}
-                    type="text"
-                    pattern="\d*"
-                    maxLength={1}
-                    value={otpCode[idx]}
-                    onChange={(e) => handleOtpChange(e.target.value, idx)}
-                    onKeyDown={(e) => handleKeyDown(e, idx)}
-                    style={{
-                      width: 44,
-                      height: 48,
-                      fontSize: 20,
-                      textAlign: 'center',
-                      borderRadius: 6,
-                      border: '1px solid var(--line)',
-                      background: 'var(--surface)',
-                      fontWeight: '600',
-                      color: 'var(--ink)',
-                      outline: 'none'
-                    }}
-                  />
-                ))}
-              </div>
-
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-                {countdown > 0 ? (
-                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--muted)' }}>
-                    Resend code in {countdown}s
-                  </span>
-                ) : (
-                  <Button type="link" style={{ padding: 0 }} onClick={() => handleSendOtp()}>
-                    Resend OTP code
-                  </Button>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', width: '100%' }}>
-                  <Button
-                    type="default"
-                    size="large"
-                    onClick={() => setOtpStep('request')}
-                  >
-                    Change email/phone
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
-      {loginMode === 'password' && (
+      {step === 'form' && (
         <>
           <div className="auth-divider">Demo logins</div>
 

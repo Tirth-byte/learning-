@@ -18,8 +18,10 @@ const authController = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/authMiddleware');
 
 // Public Guest Routes: Accessible by anyone to sign up or recover lost passwords
+router.post('/register/start', authController.registerStart);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/login/verify', authController.loginVerify);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/send-otp', authController.sendOtp);
 router.post('/verify-otp', authController.verifyOtp);

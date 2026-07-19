@@ -43,13 +43,12 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [passwordValue, setPasswordValue] = useState('');
-  const { register, loginWithToken } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
-  // OTP Registration States
-  const [registerMode, setRegisterMode] = useState('password'); // 'password' or 'otp'
-  const [otpStep, setOtpStep] = useState('request'); // 'request', 'verify', 'complete'
-  const [identifier, setIdentifier] = useState('');
+  // Registration Flow States
+  const [step, setStep] = useState('form'); // 'form' or 'otp'
+  const [pendingValues, setPendingValues] = useState(null);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(0);
 
@@ -66,94 +65,72 @@ const Register = () => {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  /** Create the account via password flow then route into the storefront. */
-  const onFinishPassword = async (values) => {
+  // Initiate signup: validate inputs and trigger OTP sending
+  const onFinishForm = async (values) => {
     setLoading(true);
     setError(null);
     try {
-      await register({
+      await api.post('/auth/register/start', {
         name: values.name,
         email: values.email,
         phone: values.phone,
         password: values.password,
         confirmPassword: values.confirmPassword,
       });
-      navigate('/products');
+      
+      // Save values and show OTP verify step
+      setPendingValues(values);
+      setStep('otp');
+      setCountdown(30);
+      setOtpCode(['', '', '', '', '', '']);
+      setTimeout(() => otpRefs.current[0]?.current?.focus(), 100);
+      message.success('Verification OTP code sent to your email.');
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.message || 'Failed to start registration.');
     } finally {
       setLoading(false);
     }
   };
 
-  /** Complete registration after OTP verification */
-  const onFinishOtpComplete = async (values) => {
+  // Re-send OTP code
+  const handleResendOtp = async () => {
+    if (!pendingValues?.email) return;
     setLoading(true);
     setError(null);
     try {
-      const isEmail = identifier.includes('@');
-      const payload = {
-        name: values.name,
-        email: isEmail ? identifier : values.email,
-        phone: isEmail ? values.phone : identifier,
-        password: values.password,
-        confirmPassword: values.confirmPassword,
-        isOtpSignup: true,
-        otpIdentifier: identifier,
-      };
-
-      await register(payload);
-      message.success('Account created successfully');
-      navigate('/products');
-    } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** Send verification code for registration */
-  const handleSendOtp = async () => {
-    if (!identifier) {
-      setError('Please enter your email or phone number.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.post('/auth/send-otp', { identifier });
+      const response = await api.post('/auth/send-otp', { identifier: pendingValues.email });
       if (response.data.code) {
         console.log(`[Demo Dev Mode] Received OTP code: ${response.data.code}`);
         message.info(`[Demo OTP] Code: ${response.data.code}`);
       }
-      setOtpStep('verify');
       setCountdown(30);
       setOtpCode(['', '', '', '', '', '']);
       setTimeout(() => otpRefs.current[0]?.current?.focus(), 100);
+      message.success('New verification code sent to your email.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send OTP.');
+      setError(err.response?.data?.message || 'Failed to resend OTP.');
     } finally {
       setLoading(false);
     }
   };
 
-  /** Verify code for signup */
+  // Verify OTP and complete registration
   const handleVerifyOtp = async (codeStr) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/auth/verify-otp', { identifier, code: codeStr });
-      const { action } = response.data.data;
-      if (action === 'signup_verified') {
-        setOtpStep('complete');
-      } else if (action === 'login') {
-        const { token, user } = response.data.data;
-        loginWithToken(user, token);
-        message.success('Account already exists. Logged in successfully.');
-        navigate(user.role === 'CUSTOMER' ? '/products' : '/admin/dashboard');
-      }
+      await register({
+        name: pendingValues.name,
+        email: pendingValues.email,
+        phone: pendingValues.phone,
+        password: pendingValues.password,
+        confirmPassword: pendingValues.confirmPassword,
+        code: codeStr,
+      });
+      message.success('Account created successfully');
+      navigate('/products');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired OTP code.');
+      setError(err.message || 'Verification failed. Please try again.');
       setOtpCode(['', '', '', '', '', '']);
       otpRefs.current[0]?.current?.focus();
     } finally {
@@ -185,15 +162,15 @@ const Register = () => {
   return (
     <AuthShell
       title="Create your account"
-      subtitle={registerMode === 'password' ? 'Set up a customer account to rent equipment.' : 'Set up a customer account instantly using OTP.'}
+      subtitle={step === 'form' ? 'Set up a customer account to rent equipment.' : 'Verify your email address to complete registration.'}
       panelTitle="Start renting in minutes."
       panelText="Browse the catalog, choose your rental window, and check out with the deposit shown up front."
       footer={<>Already have an account? <Link to="/login">Sign in</Link></>}
     >
       {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 'var(--s-5)' }} />}
 
-      {registerMode === 'password' ? (
-        <Form name="register" onFinish={onFinishPassword} layout="vertical" requiredMark={false}>
+      {step === 'form' ? (
+        <Form name="register" onFinish={onFinishForm} layout="vertical" requiredMark={false}>
           <Form.Item
             name="name"
             label="Full name"
@@ -296,239 +273,64 @@ const Register = () => {
             />
           </Form.Item>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)', marginTop: 'var(--s-2)' }}>
-            <Button
-              type="default"
-              size="large"
-              onClick={() => {
-                setRegisterMode('otp');
-                setOtpStep('request');
-              }}
-            >
-              Sign up with OTP
-            </Button>
-            <Button type="primary" htmlType="submit" loading={loading} size="large">
-              Create account
-            </Button>
-          </div>
+          <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ marginTop: 'var(--s-4)' }}>
+            Sign Up
+          </Button>
         </Form>
       ) : (
-        <div>
-          {otpStep === 'request' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: 'var(--t-sm)', fontWeight: 650, color: 'var(--ink)' }}>Email or Phone number</label>
-                <Input
-                  size="large"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="name@company.com or 9876543210"
-                  prefix={<MailOutlined style={{ color: 'var(--faint)' }} />}
-                />
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{ textAlign: 'center', fontSize: 'var(--t-sm)', color: 'var(--body)' }}>
+            Enter the 6-digit code sent to <strong style={{ color: 'var(--ink)' }}>{pendingValues?.email}</strong>
+          </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s-3)' }}>
-                <Button
-                  type="default"
-                  size="large"
-                  onClick={() => setRegisterMode('password')}
-                >
-                  Back to Password
-                </Button>
-                <Button
-                  type="primary"
-                  size="large"
-                  loading={loading}
-                  onClick={handleSendOtp}
-                >
-                  Send OTP
-                </Button>
-              </div>
-            </div>
-          ) : otpStep === 'verify' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-              <div style={{ textAlign: 'center', fontSize: 'var(--t-sm)', color: 'var(--body)' }}>
-                Enter the 6-digit code sent to <strong style={{ color: 'var(--ink)' }}>{identifier}</strong>
-              </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0' }}>
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <input
+                key={idx}
+                ref={otpRefs.current[idx]}
+                type="text"
+                pattern="\d*"
+                maxLength={1}
+                value={otpCode[idx]}
+                onChange={(e) => handleOtpChange(e.target.value, idx)}
+                onKeyDown={(e) => handleKeyDown(e, idx)}
+                style={{
+                  width: 44,
+                  height: 48,
+                  fontSize: 20,
+                  textAlign: 'center',
+                  borderRadius: 6,
+                  border: '1px solid var(--line)',
+                  background: 'var(--surface)',
+                  fontWeight: '600',
+                  color: 'var(--ink)',
+                  outline: 'none'
+                }}
+              />
+            ))}
+          </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', margin: '12px 0' }}>
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <input
-                    key={idx}
-                    ref={otpRefs.current[idx]}
-                    type="text"
-                    pattern="\d*"
-                    maxLength={1}
-                    value={otpCode[idx]}
-                    onChange={(e) => handleOtpChange(e.target.value, idx)}
-                    onKeyDown={(e) => handleKeyDown(e, idx)}
-                    style={{
-                      width: 44,
-                      height: 48,
-                      fontSize: 20,
-                      textAlign: 'center',
-                      borderRadius: 6,
-                      border: '1px solid var(--line)',
-                      background: 'var(--surface)',
-                      fontWeight: '600',
-                      color: 'var(--ink)',
-                      outline: 'none'
-                    }}
-                  />
-                ))}
-              </div>
-
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-                {countdown > 0 ? (
-                  <span style={{ fontSize: 'var(--t-xs)', color: 'var(--muted)' }}>
-                    Resend code in {countdown}s
-                  </span>
-                ) : (
-                  <Button type="link" style={{ padding: 0 }} onClick={() => handleSendOtp()}>
-                    Resend OTP code
-                  </Button>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', width: '100%' }}>
-                  <Button
-                    type="default"
-                    size="large"
-                    onClick={() => setOtpStep('request')}
-                  >
-                    Change email/phone
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Form name="register_complete" onFinish={onFinishOtpComplete} layout="vertical" requiredMark={false}>
-              <Form.Item
-                name="name"
-                label="Full name"
-                rules={[{ required: true, message: 'Enter your full name.' }]}
-              >
-                <Input
-                  size="large"
-                  autoComplete="name"
-                  prefix={<UserOutlined style={{ color: 'var(--faint)' }} />}
-                  placeholder="Aarav Sharma"
-                />
-              </Form.Item>
-
-              {identifier.includes('@') ? (
-                <>
-                  <Form.Item
-                    label="Email address"
-                    help="Email address verified via OTP"
-                  >
-                    <Input size="large" value={identifier} disabled prefix={<MailOutlined style={{ color: 'var(--faint)' }} />} />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="phone"
-                    label="Phone number (optional)"
-                    rules={[{ pattern: /^\d{10,15}$/, message: 'Must be a valid 10-15 digit number.' }]}
-                  >
-                    <Input
-                      size="large"
-                      autoComplete="tel"
-                      prefix={<PhoneOutlined style={{ color: 'var(--faint)' }} />}
-                      placeholder="9876543210"
-                    />
-                  </Form.Item>
-                </>
-              ) : (
-                <>
-                  <Form.Item
-                    label="Phone number"
-                    help="Phone number verified via OTP"
-                  >
-                    <Input size="large" value={identifier} disabled prefix={<PhoneOutlined style={{ color: 'var(--faint)' }} />} />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="email"
-                    label="Email address"
-                    rules={[
-                      { required: true, message: 'Enter your email address.' },
-                      { type: 'email', message: 'That does not look like a valid email.' },
-                    ]}
-                  >
-                    <Input
-                      size="large"
-                      autoComplete="email"
-                      prefix={<MailOutlined style={{ color: 'var(--faint)' }} />}
-                      placeholder="name@company.com"
-                    />
-                  </Form.Item>
-                </>
-              )}
-
-              <Form.Item
-                name="password"
-                label="Password"
-                rules={[
-                  { required: true, message: 'Choose a password.' },
-                  {
-                    validator: (_, value) => {
-                      if (!value) return Promise.resolve();
-                      const failed = PASSWORD_RULES.filter((rule) => !rule.test(value));
-                      return failed.length === 0
-                        ? Promise.resolve()
-                        : Promise.reject(new Error('Password does not meet requirements.'));
-                    },
-                  },
-                ]}
-              >
-                <Input.Password
-                  size="large"
-                  autoComplete="new-password"
-                  prefix={<LockOutlined style={{ color: 'var(--faint)' }} />}
-                  placeholder="••••••••"
-                  onChange={(event) => setPasswordValue(event.target.value)}
-                />
-              </Form.Item>
-
-              <div className="auth-rules">
-                {PASSWORD_RULES.map((rule) => {
-                  const isMet = passwordValue.length > 0 && rule.test(passwordValue);
-                  return (
-                    <div key={rule.key} className={`auth-rule${isMet ? ' is-met' : ''}`}>
-                      {isMet ? <CheckCircleFilled /> : <MinusCircleOutlined />}
-                      {rule.label}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Form.Item
-                name="confirmPassword"
-                label="Confirm password"
-                dependencies={['password']}
-                style={{ marginTop: 'var(--s-5)' }}
-                rules={[
-                  { required: true, message: 'Re-enter your password.' },
-                  ({ getFieldValue }) => ({
-                    validator(_, value) {
-                      if (!value || getFieldValue('password') === value) return Promise.resolve();
-                      return Promise.reject(new Error('Passwords do not match.'));
-                    },
-                  }),
-                ]}
-              >
-                <Input.Password
-                  size="large"
-                  autoComplete="new-password"
-                  prefix={<LockOutlined style={{ color: 'var(--faint)' }} />}
-                  placeholder="••••••••"
-                />
-              </Form.Item>
-
-              <Button type="primary" htmlType="submit" loading={loading} block size="large" style={{ marginTop: 'var(--s-2)' }}>
-                Complete signup
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            {countdown > 0 ? (
+              <span style={{ fontSize: 'var(--t-xs)', color: 'var(--muted)' }}>
+                Resend code in {countdown}s
+              </span>
+            ) : (
+              <Button type="link" style={{ padding: 0 }} onClick={handleResendOtp}>
+                Resend OTP code
               </Button>
-            </Form>
-          )}
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', width: '100%', marginTop: '8px' }}>
+              <Button
+                type="default"
+                size="large"
+                onClick={() => setStep('form')}
+              >
+                Back to Details
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </AuthShell>

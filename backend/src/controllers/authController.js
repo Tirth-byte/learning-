@@ -17,6 +17,19 @@ const authService = require('../services/authService');
 
 class AuthController {
 
+  async registerStart(req, res, next) {
+    try {
+      const result = await authService.registerStart(req.body);
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        code: result.code
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * Register a new user account.
    * 
@@ -56,11 +69,25 @@ class AuthController {
       
       return res.status(200).json({
         success: true,
-        message: 'Login successful',
+        message: loginResult.requireOtp ? 'OTP required' : 'Login successful',
         data: loginResult,
       });
     } catch (error) {
       // Forward credential match failures to client
+      next(error);
+    }
+  }
+
+  async loginVerify(req, res, next) {
+    try {
+      const { email, code } = req.body;
+      const result = await authService.loginVerify(email, code);
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: result
+      });
+    } catch (error) {
       next(error);
     }
   }
