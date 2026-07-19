@@ -398,10 +398,9 @@ class AuthService {
     }
 
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
-    const isPhone = /^\+?\d{10,15}$/.test(identifier);
 
-    if (!isEmail && !isPhone) {
-      throw { statusCode: 400, message: 'Please provide a valid email address or phone number' };
+    if (!isEmail) {
+      throw { statusCode: 400, message: 'Only email verification is supported at this time. Please use email.' };
     }
 
     // Rate-limit check: check if there's a code created in the last 30s
@@ -450,24 +449,6 @@ class AuthService {
         }
       } else {
         console.log(`[OTP SERVICE] SMTP not configured. Mocking email delivery to console.`);
-      }
-    }
-
-    // Real SMS delivery
-    if (isPhone) {
-      if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
-        try {
-          await twilioClient.messages.create({
-            body: `Your Odoo Rent verification code is ${otpCode}. Valid for 5 minutes.`,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: identifier
-          });
-          console.log(`[OTP SERVICE] Real OTP SMS sent successfully to ${identifier}`);
-        } catch (err) {
-          console.error('[OTP SERVICE] Failed to send real OTP SMS:', err);
-        }
-      } else {
-        console.log(`[OTP SERVICE] Twilio not configured. Mocking SMS delivery to console.`);
       }
     }
 
